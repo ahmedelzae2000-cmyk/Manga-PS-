@@ -25,11 +25,30 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
 
+      - name: Fix Android Project & Embedding V2
+        run: |
+          # 1. حفظ نسخة من google-services.json إذا كان موجوداً
+          cp android/app/google-services.json ./google-services.json.bak || true
+
+          # 2. حذف مجلد android القديم بالكامل لمنع مشاكل V1 Embedding
+          rm -rf android
+
+          # 3. إعادة إنشاء مجلد android نقي وحديث
+          flutter create . --project-name=manga_ps --platforms=android --org=com.mangaps.app
+
+          # 4. استرجاع google-services.json لمكانه الصحيح
+          mkdir -p android/app
+          cp ./google-services.json.bak android/app/google-services.json || true
+
+          # 5. رفع minSdkVersion لـ 23 لملاءمة Firebase
+          sed -i 's/minSdkVersion .*/minSdkVersion 23/' android/app/build.gradle || true
+          sed -i 's/flutter.minSdkVersion/23/' android/app/build.gradle || true
+
       - name: Get Dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --verbose
+        run: flutter build apk --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
