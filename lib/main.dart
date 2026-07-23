@@ -29,7 +29,7 @@ class MangaPsApp extends StatelessWidget {
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  // إضافة جهاز جديد تلقائياً للتجربة
+  // إضافة جهاز جديد تلقائياً
   Future<void> _addDevice(BuildContext context) async {
     final count = await FirebaseFirestore.instance.collection('devices').get();
     final newId = count.docs.length + 1;
@@ -41,6 +41,63 @@ class HomeScreen extends StatelessWidget {
       'hourlyRateSingle': 20.0,
       'hourlyRateMulti': 30.0,
     });
+  }
+
+  // تعديل أسعار الجهاز (فردي / زوجي)
+  void _editDeviceRates(BuildContext context, DeviceModel device) {
+    final singleController =
+        TextEditingController(text: device.hourlyRateSingle.toString());
+    final multiController =
+        TextEditingController(text: device.hourlyRateMulti.toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('تعديل أسعار ${device.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: singleController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'سعر الساعة (فردي/عادي)',
+                suffixText: 'جنيه',
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: multiController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'سعر الساعة (زوجي/ملتي)',
+                suffixText: 'جنيه',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newSingle = double.tryParse(singleController.text) ?? device.hourlyRateSingle;
+              final newMulti = double.tryParse(multiController.text) ?? device.hourlyRateMulti;
+
+              FirebaseFirestore.instance.collection('devices').doc(device.id).update({
+                'hourlyRateSingle': newSingle,
+                'hourlyRateMulti': newMulti,
+              });
+
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('حفظ التعديل'),
+          ),
+        ],
+      ),
+    );
   }
 
   // بدء الجلسة
@@ -79,8 +136,9 @@ class HomeScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('نوع الجلسة: ${device.sessionType == 'Single' ? 'عادي' : 'ملتي'}'),
+            Text('نوع الجلسة: ${device.sessionType == 'Single' ? 'فردي (عادي)' : 'زوجي (ملتي)'}'),
             Text('الوقت المنقضي: ${duration.inMinutes} دقيقة'),
+            Text('سعر الساعة: $rate جنيه'),
             const SizedBox(height: 10),
             Text(
               'المبلغ المطلوب: ${total.toStringAsFixed(2)} جنيه',
@@ -135,7 +193,7 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 0.85,
+              childAspectRatio: 0.75,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
             ),
@@ -157,25 +215,39 @@ class HomeScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      Text(
-                        device.name,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.settings, size: 20),
+                            onPressed: () => _editDeviceRates(context, device),
+                            tooltip: 'تعديل الأسعار',
+                          ),
+                          Text(
+                            device.name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                       Icon(
                         Icons.sports_esports,
-                        size: 40,
+                        size: 36,
                         color: device.isOccupied ? Colors.red : Colors.green,
                       ),
                       Text(
                         device.isOccupied ? 'مشغول' : 'متاح',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: device.isOccupied ? Colors.red : Colors.green,
                         ),
+                      ),
+                      Text(
+                        'فردي: ${device.hourlyRateSingle}ج | زوجي: ${device.hourlyRateMulti}ج',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                       if (!device.isOccupied) ...[
                         Row(
@@ -183,13 +255,19 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             ElevatedButton(
                               onPressed: () => _startSession(device.id, 'Single'),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                              child: const Text('فردي', style: TextStyle(color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              child: const Text('فردي', style: TextStyle(color: Colors.white, fontSize: 12)),
                             ),
                             ElevatedButton(
                               onPressed: () => _startSession(device.id, 'Multi'),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-                              child: const Text('زوجي', style: TextStyle(color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              child: const Text('زوجي', style: TextStyle(color: Colors.white, fontSize: 12)),
                             ),
                           ],
                         )
@@ -197,8 +275,8 @@ class HomeScreen extends StatelessWidget {
                         ElevatedButton.icon(
                           onPressed: () => _stopSession(context, device),
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                          icon: const Icon(Icons.stop, color: Colors.white),
-                          label: const Text('إنهاء وسداد', style: TextStyle(color: Colors.white)),
+                          icon: const Icon(Icons.stop, color: Colors.white, size: 16),
+                          label: const Text('إنهاء وسداد', style: TextStyle(color: Colors.white, fontSize: 12)),
                         ),
                       ],
                     ],
