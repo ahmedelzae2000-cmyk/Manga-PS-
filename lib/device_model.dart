@@ -2,12 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DeviceModel {
   final String id;
-  final String name; // اسم أو رقم الجهاز (مثلاً: جهاز 1)
+  final String name; // اسم أو رقم الجهاز
   final bool isOccupied; // هل الجهاز مشغول حالياً؟
   final String sessionType; // نوع الجلسة: 'Single' أو 'Multi'
   final DateTime? startTime; // وقت بداية الجلسة
-  final double hourlyRateSingle; // سعر الساعة عادي
-  final double hourlyRateMulti; // سعر الساعة ملتي
+  final double hourlyRateSingle; // سعر الساعة عادي/فردي
+  final double hourlyRateMulti; // سعر الساعة ملتي/زوجي
 
   DeviceModel({
     required this.id,
@@ -15,8 +15,8 @@ class DeviceModel {
     this.isOccupied = false,
     this.sessionType = 'Single',
     this.startTime,
-    this.hourlyRateSingle = 20.0, // سعر افتراضي
-    this.hourlyRateMulti = 30.0,  // سعر افتراضي
+    this.hourlyRateSingle = 20.0,
+    this.hourlyRateMulti = 30.0,
   });
 
   // تحويل البيانات من Firestore إلى Object
