@@ -26,7 +26,7 @@ jobs:
           channel: 'stable'
 
       - name: Recreate Android Project cleanly
-        run: flutter create . --platforms=android --org=com.mangaps.app
+        run: flutter create . --project-name=manga_ps --platforms=android --org=com.mangaps.app
 
       - name: Get Dependencies
         run: flutter pub get
