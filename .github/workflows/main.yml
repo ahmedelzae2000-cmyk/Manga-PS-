@@ -25,10 +25,15 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
 
-      - name: Clean old android folder and recreate
+      - name: Recreate Android Project cleanly
         run: |
           rm -rf android
           flutter create . --project-name=manga_ps --platforms=android --org=com.mangaps.app
+
+      - name: Fix Min SDK Version for Firebase
+        run: |
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle || true
+          sed -i 's/flutter.minSdkVersion/21/' android/app/build.gradle || true
 
       - name: Get Dependencies
         run: flutter pub get
@@ -41,4 +46,3 @@ jobs:
         with:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
- 
