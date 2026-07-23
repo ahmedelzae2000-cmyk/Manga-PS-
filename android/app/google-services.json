@@ -1,1 +1,29 @@
-
+{
+  "project_info": {
+    "project_number": "49681326088",
+    "project_id": "manga-ps",
+    "storage_bucket": "manga-ps.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:49681326088:android:75b513b58a8bfcc21431bd",
+        "android_client_info": {
+          "package_name": "com.mangaps.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCY8JW1ZEpzcv5REpqrGNE7fjGIzSyb2nM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
