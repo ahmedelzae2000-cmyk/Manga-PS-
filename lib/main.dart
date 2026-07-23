@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package0:cloud_firestore/cloud_firestore.dart';
 import 'device_model.dart';
+import 'expense_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +30,7 @@ class MangaPsApp extends StatelessWidget {
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  // إضافة جهاز جديد تلقائياً
+  // إضافة جهاز جديد
   Future<void> _addDevice(BuildContext context) async {
     final count = await FirebaseFirestore.instance.collection('devices').get();
     final newId = count.docs.length + 1;
@@ -43,36 +44,27 @@ class HomeScreen extends StatelessWidget {
     });
   }
 
-  // تعديل أسعار الجهاز (فردي / زوجي)
-  void _editDeviceRates(BuildContext context, DeviceModel device) {
-    final singleController =
-        TextEditingController(text: device.hourlyRateSingle.toString());
-    final multiController =
-        TextEditingController(text: device.hourlyRateMulti.toString());
+  // إضافة مصروف جديد
+  void _addExpense(BuildContext context) {
+    final titleController = TextEditingController();
+    final amountController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('تعديل أسعار ${device.name}'),
+        title: const Text('إضافة مصروف جديد 💸'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: singleController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'سعر الساعة (فردي/عادي)',
-                suffixText: 'جنيه',
-              ),
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'سبب الصرف (مثلاً: شاي/صيانة)'),
             ),
             const SizedBox(height: 10),
             TextField(
-              controller: multiController,
+              controller: amountController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'سعر الساعة (زوجي/ملتي)',
-                suffixText: 'جنيه',
-              ),
+              decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'جنيه'),
             ),
           ],
         ),
@@ -82,18 +74,69 @@ class HomeScreen extends StatelessWidget {
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
-            onPressed: () {
-              final newSingle = double.tryParse(singleController.text) ?? device.hourlyRateSingle;
-              final newMulti = double.tryParse(multiController.text) ?? device.hourlyRateMulti;
+            onPressed: () async {
+              final title = titleController.text.trim();
+              final amount = double.tryParse(amountController.text) ?? 0.0;
 
-              FirebaseFirestore.instance.collection('devices').doc(device.id).update({
-                'hourlyRateSingle': newSingle,
-                'hourlyRateMulti': newMulti,
-              });
-
-              Navigator.of(ctx).pop();
+              if (title.isNotEmpty && amount > 0) {
+                await FirebaseFirestore.instance.collection('expenses').add({
+                  'title': title,
+                  'amount': amount,
+                  'date': FieldValue.serverTimestamp(),
+                });
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('تم تسجيل المصروف بنجاح')),
+                );
+              }
             },
-            child: const Text('حفظ التعديل'),
+            child: const Text('حفظ المصروف'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // عرض تقرير الوردية (الشيفت)
+  void _showShiftReport(BuildContext context) async {
+    // جلب إجمالي الأرباح من الجلسات المغلقة
+    final sessionsDocs = await FirebaseFirestore.instance.collection('completed_sessions').get();
+    double totalIncome = 0.0;
+    for (var doc in sessionsDocs.docs) {
+      totalIncome += (doc.data()['totalAmount'] ?? 0.0).toDouble();
+    }
+
+    // جلب إجمالي المصاريف
+    final expenseDocs = await FirebaseFirestore.instance.collection('expenses').get();
+    double totalExpenses = 0.0;
+    for (var doc in expenseDocs.docs) {
+      totalExpenses += (doc.data()['amount'] ?? 0.0).toDouble();
+    }
+
+    final netProfit = totalIncome - totalExpenses;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('📊 تقرير الوردية الحالية'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('إجمالي دخل الجلسات: ${totalIncome.toStringAsFixed(2)} جنيه',
+                style: const TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('إجمالي المصاريف: ${totalExpenses.toStringAsFixed(2)} جنيه',
+                style: const TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
+            const Divider(height: 20),
+            Text('صافي أرباح الوردية: ${netProfit.toStringAsFixed(2)} جنيه',
+                style: const TextStyle(fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('إغلاق'),
           ),
         ],
       ),
@@ -109,8 +152,8 @@ class HomeScreen extends StatelessWidget {
     });
   }
 
-  // إنهاء الجلسة وحساب الحساب
-  void _stopSession(BuildContext context, DeviceModel device) {
+  // إنهاء الجلسة وحفظ قيمتها في الأرباح
+  void _stopSession(BuildContext context, DeviceModel device) async {
     if (device.startTime == null) return;
 
     final now = DateTime.now();
@@ -122,9 +165,17 @@ class HomeScreen extends StatelessWidget {
     final total = hours * rate;
 
     // إعادة ضبط الجهاز
-    FirebaseFirestore.instance.collection('devices').doc(device.id).update({
+    await FirebaseFirestore.instance.collection('devices').doc(device.id).update({
       'isOccupied': false,
       'startTime': null,
+    });
+
+    // تسجيل الجلسة كمنتهية لحساب التقارير
+    await FirebaseFirestore.instance.collection('completed_sessions').add({
+      'deviceName': device.name,
+      'totalAmount': total,
+      'sessionType': device.sessionType,
+      'endTime': FieldValue.serverTimestamp(),
     });
 
     // عرض الفاتورة
@@ -136,24 +187,19 @@ class HomeScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('نوع الجلسة: ${device.sessionType == 'Single' ? 'فردي (عادي)' : 'زوجي (ملتي)'}'),
-            Text('الوقت المنقضي: ${duration.inMinutes} دقيقة'),
-            Text('سعر الساعة: $rate جنيه'),
+            Text('نوع الجلسة: ${device.sessionType == 'Single' ? 'فردي' : 'زوجي'}'),
+            Text('الوقت: ${duration.inMinutes} دقيقة'),
             const SizedBox(height: 10),
             Text(
               'المبلغ المطلوب: ${total.toStringAsFixed(2)} جنيه',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('تم'),
+            child: const Text('تم السداد'),
           ),
         ],
       ),
@@ -164,8 +210,20 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manga PS - إدارة الأجهزة'),
+        title: const Text('Manga PS - إدارة الوردية'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long),
+            tooltip: 'تقرير الوردية',
+            onPressed: () => _showShiftReport(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.money_off),
+            tooltip: 'إضافة مصروف',
+            onPressed: () => _addExpense(context),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addDevice(context),
@@ -181,7 +239,7 @@ class HomeScreen extends StatelessWidget {
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
-              child: Text('لا توجد أجهزة مضافة بعد. اضغط على زر "إضافة جهاز" بالأسفل.'),
+              child: Text('لا توجد أجهزة مضافة بعد.'),
             );
           }
 
@@ -193,7 +251,7 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.8,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
             ),
@@ -215,22 +273,9 @@ class HomeScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.settings, size: 20),
-                            onPressed: () => _editDeviceRates(context, device),
-                            tooltip: 'تعديل الأسعار',
-                          ),
-                          Text(
-                            device.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        device.name,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       Icon(
                         Icons.sports_esports,
@@ -245,29 +290,19 @@ class HomeScreen extends StatelessWidget {
                           color: device.isOccupied ? Colors.red : Colors.green,
                         ),
                       ),
-                      Text(
-                        'فردي: ${device.hourlyRateSingle}ج | زوجي: ${device.hourlyRateMulti}ج',
-                        style: const TextStyle(fontSize: 11, color: Colors.grey),
-                      ),
                       if (!device.isOccupied) ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             ElevatedButton(
                               onPressed: () => _startSession(device.id, 'Single'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                              ),
-                              child: const Text('فردي', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                              child: const Text('فردي', style: TextStyle(color: Colors.white, fontSize: 11)),
                             ),
                             ElevatedButton(
                               onPressed: () => _startSession(device.id, 'Multi'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.purple,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                              ),
-                              child: const Text('زوجي', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                              child: const Text('زوجي', style: TextStyle(color: Colors.white, fontSize: 11)),
                             ),
                           ],
                         )
@@ -276,7 +311,7 @@ class HomeScreen extends StatelessWidget {
                           onPressed: () => _stopSession(context, device),
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                           icon: const Icon(Icons.stop, color: Colors.white, size: 16),
-                          label: const Text('إنهاء وسداد', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          label: const Text('إنهاء وسداد', style: TextStyle(color: Colors.white, fontSize: 11)),
                         ),
                       ],
                     ],
@@ -290,3 +325,4 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+ 
