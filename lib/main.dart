@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package0:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'device_model.dart';
 import 'expense_model.dart';
 
@@ -84,10 +84,12 @@ class HomeScreen extends StatelessWidget {
                   'amount': amount,
                   'date': FieldValue.serverTimestamp(),
                 });
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم تسجيل المصروف بنجاح')),
-                );
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('تم تسجيل المصروف بنجاح')),
+                  );
+                }
               }
             },
             child: const Text('حفظ المصروف'),
@@ -115,32 +117,34 @@ class HomeScreen extends StatelessWidget {
 
     final netProfit = totalIncome - totalExpenses;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('📊 تقرير الوردية الحالية'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('إجمالي دخل الجلسات: ${totalIncome.toStringAsFixed(2)} جنيه',
-                style: const TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('إجمالي المصاريف: ${totalExpenses.toStringAsFixed(2)} جنيه',
-                style: const TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
-            const Divider(height: 20),
-            Text('صافي أرباح الوردية: ${netProfit.toStringAsFixed(2)} جنيه',
-                style: const TextStyle(fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold)),
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('📊 تقرير الوردية الحالية'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('إجمالي دخل الجلسات: ${totalIncome.toStringAsFixed(2)} جنيه',
+                  style: const TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('إجمالي المصاريف: ${totalExpenses.toStringAsFixed(2)} جنيه',
+                  style: const TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
+              const Divider(height: 20),
+              Text('صافي أرباح الوردية: ${netProfit.toStringAsFixed(2)} جنيه',
+                  style: const TextStyle(fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('إغلاق'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('إغلاق'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   // بدء الجلسة
@@ -179,31 +183,33 @@ class HomeScreen extends StatelessWidget {
     });
 
     // عرض الفاتورة
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('فاتورة ${device.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('نوع الجلسة: ${device.sessionType == 'Single' ? 'فردي' : 'زوجي'}'),
-            Text('الوقت: ${duration.inMinutes} دقيقة'),
-            const SizedBox(height: 10),
-            Text(
-              'المبلغ المطلوب: ${total.toStringAsFixed(2)} جنيه',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('فاتورة ${device.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('نوع الجلسة: ${device.sessionType == 'Single' ? 'فردي' : 'زوجي'}'),
+              Text('الوقت: ${duration.inMinutes} دقيقة'),
+              const SizedBox(height: 10),
+              Text(
+                'المبلغ المطلوب: ${total.toStringAsFixed(2)} جنيه',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('تم السداد'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('تم السداد'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -325,4 +331,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
- 
