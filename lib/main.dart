@@ -93,13 +93,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      setState(() {
-        for (var device in devices) {
-          if (device.isActive) {
-            device.elapsedSeconds++;
+      if (mounted) {
+        setState(() {
+          for (var device in devices) {
+            if (device.isActive) {
+              device.elapsedSeconds++;
+            }
           }
-        }
-      });
+        });
+      }
     });
   }
 
@@ -129,51 +131,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
     double cost = calculateCost(device);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('إنهاء جلسة ${device.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('الوقت: ${formatTime(device.elapsedSeconds)}'),
-            Text('المبلغ المستحق: ${cost.toStringAsFixed(2)} ج.م',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-            const SizedBox(height: 10),
-            const Text('طريقة الدفع:'),
-            DropdownButton<String>(
-              value: device.paymentMethod,
-              isExpanded: true,
-              items: ['كاش (نقداً)', 'فيزا'].map((val) {
-                return DropdownMenuItem(value: val, child: Text(val));
-              }).toList,
-              onChanged: (val) {
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('إنهاء جلسة ${device.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('الوقت: ${formatTime(device.elapsedSeconds)}'),
+              Text('المبلغ المستحق: ${cost.toStringAsFixed(2)} ج.م',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+              const SizedBox(height: 10),
+              const Text('طريقة الدفع:'),
+              DropdownButton<String>(
+                value: device.paymentMethod,
+                isExpanded: true,
+                items: ['كاش (نقداً)', 'فيزا'].map((val) {
+                  return DropdownMenuItem(value: val, child: Text(val));
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setDialogState(() {
+                      device.paymentMethod = val;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () {
                 setState(() {
-                  device.paymentMethod = val!;
+                  if (device.paymentMethod == 'كاش (نقداً)') {
+                    totalCashRevenue += cost;
+                  } else {
+                    totalVisaRevenue += cost;
+                  }
+                  device.isActive = false;
+                  device.elapsedSeconds = 0;
                 });
-                Navigator.pop(context);
-                stopAndCheckout(device);
+                Navigator.pop(dialogContext);
               },
+              child: const Text('تأكيد التحصيل والإغلاق', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              setState(() {
-                if (device.paymentMethod == 'كاش (نقداً)') {
-                  totalCashRevenue += cost;
-                } else {
-                  totalVisaRevenue += cost;
-                }
-                device.isActive = false;
-                device.elapsedSeconds = 0;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('تأكيد التحصيل والإغلاق'),
-          ),
-        ],
       ),
     );
   }
@@ -193,80 +197,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('القائمة والإدارة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-              ],
-            ),
-            const Divider(),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: ListView(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('القائمة والإدارة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(sheetContext)),
+                ],
+              ),
+              const Divider(),
 
-            // تعديل الأسعار
-            const Text('⚙️ أسعار الساعات', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
-            TextField(controller: ps4SController, decoration: const InputDecoration(labelText: 'سنجل PS4'), keyboardType: TextInputType.number),
-            TextField(controller: ps4MController, decoration: const InputDecoration(labelText: 'ملتي PS4'), keyboardType: TextInputType.number),
-            TextField(controller: ps5SController, decoration: const InputDecoration(labelText: 'سنجل PS5'), keyboardType: TextInputType.number),
-            TextField(controller: ps5MController, decoration: const InputDecoration(labelText: 'ملتي PS5'), keyboardType: TextInputType.number),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  ps4SingleRate = double.tryParse(ps4SController.text) ?? ps4SingleRate;
-                  ps4MultiRate = double.tryParse(ps4MController.text) ?? ps4MultiRate;
-                  ps5SingleRate = double.tryParse(ps5SController.text) ?? ps5SingleRate;
-                  ps5MultiRate = double.tryParse(ps5MController.text) ?? ps5MultiRate;
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('حفظ الأسعار'),
-            ),
-            const Divider(height: 30),
-
-            // إضافة جهاز
-            const Text('➕ إضافة جهاز جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الجهاز (مثال: طاولة 3)')),
-            DropdownButton<String>(
-              value: selectedType,
-              isExpanded: true,
-              items: ['PS4', 'PS5'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-              onChanged: (val) => selectedType = val!,
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.pink),
-              onPressed: () {
-                if (nameController.text.isNotEmpty) {
+              // تعديل الأسعار
+              const Text('⚙️ أسعار الساعات', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
+              TextField(controller: ps4SController, decoration: const InputDecoration(labelText: 'سنجل PS4'), keyboardType: TextInputType.number),
+              TextField(controller: ps4MController, decoration: const InputDecoration(labelText: 'ملتي PS4'), keyboardType: TextInputType.number),
+              TextField(controller: ps5SController, decoration: const InputDecoration(labelText: 'سنجل PS5'), keyboardType: TextInputType.number),
+              TextField(controller: ps5MController, decoration: const InputDecoration(labelText: 'ملتي PS5'), keyboardType: TextInputType.number),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () {
                   setState(() {
-                    devices.add(DeviceModel(id: devices.length + 1, name: nameController.text, type: selectedType));
+                    ps4SingleRate = double.tryParse(ps4SController.text) ?? ps4SingleRate;
+                    ps4MultiRate = double.tryParse(ps4MController.text) ?? ps4MultiRate;
+                    ps5SingleRate = double.tryParse(ps5SController.text) ?? ps5SingleRate;
+                    ps5MultiRate = double.tryParse(ps5MController.text) ?? ps5MultiRate;
                   });
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('إضافة الجهاز'),
-            ),
-            const Divider(height: 30),
+                  Navigator.pop(sheetContext);
+                },
+                child: const Text('حفظ الأسعار'),
+              ),
+              const Divider(height: 30),
 
-            // تسجيل مصروف
-            const Text('💸 تسجيل مصروف جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
-            TextField(controller: expTitleController, decoration: const InputDecoration(labelText: 'اسم المصروف (كهرباء، بيبسي...)')),
-            TextField(controller: expAmountController, decoration: const InputDecoration(labelText: 'المبلغ (ج.م)'), keyboardType: TextInputType.number),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-              onPressed: () {
-                if (expTitleController.text.isNotEmpty && expAmountController.text.isNotEmpty) {
-                  setState(() {
-                    expenses.add(ExpenseModel(title: expTitleController.text, amount: double.parse(expAmountController.text)));
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('إضافة وتسجيل المصروف'),
-            ),
-          ],
+              // إضافة جهاز
+              const Text('➕ إضافة جهاز جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الجهاز (مثال: طاولة 3)')),
+              DropdownButton<String>(
+                value: selectedType,
+                isExpanded: true,
+                items: ['PS4', 'PS5'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setSheetState(() => selectedType = val);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.pink),
+                onPressed: () {
+                  if (nameController.text.isNotEmpty) {
+                    setState(() {
+                      devices.add(DeviceModel(id: devices.length + 1, name: nameController.text, type: selectedType));
+                    });
+                    Navigator.pop(sheetContext);
+                  }
+                },
+                child: const Text('إضافة الجهاز', style: TextStyle(color: Colors.white)),
+              ),
+              const Divider(height: 30),
+
+              // تسجيل مصروف
+              const Text('💸 تسجيل مصروف جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
+              TextField(controller: expTitleController, decoration: const InputDecoration(labelText: 'اسم المصروف (كهرباء، بيبسي...)')),
+              TextField(controller: expAmountController, decoration: const InputDecoration(labelText: 'المبلغ (ج.م)'), keyboardType: TextInputType.number),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                onPressed: () {
+                  if (expTitleController.text.isNotEmpty && expAmountController.text.isNotEmpty) {
+                    setState(() {
+                      expenses.add(ExpenseModel(title: expTitleController.text, amount: double.tryParse(expAmountController.text) ?? 0.0));
+                    });
+                    Navigator.pop(sheetContext);
+                  }
+                },
+                child: const Text('إضافة وتسجيل المصروف', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -300,7 +318,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Chip(label: Text(device.type), backgroundColor: device.type == 'PS4' ? Colors.blue.shade900 : Colors.purple.shade900),
+                        Chip(
+                          label: Text(device.type),
+                          backgroundColor: device.type == 'PS4' ? Colors.blue.shade900 : Colors.purple.shade900,
+                        ),
                         Text(device.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ],
                     ),
@@ -347,7 +368,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 }
                               });
                             },
-                            child: Text(device.isActive ? 'إنهاء وتصفية' : 'بدء الجلسة'),
+                            child: Text(
+                              device.isActive ? 'إنهاء وتصفية' : 'بدء الجلسة',
+                              style: const TextStyle(color: Colors.white),
+                            ),
                           ),
                         ),
                       ],
@@ -367,9 +391,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  ListTile(title: const Text('إيراد اليوم كاش 💵'), trailing: Text('$totalCashRevenue ج.م', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))),
-                  ListTile(title: const Text('إيراد اليوم فيزا 💳'), trailing: Text('$totalVisaRevenue ج.م', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))),
-                  ListTile(title: const Text('إجمالي اليوم 📅'), trailing: Text('$totalRevenue ج.م', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))),
+                  ListTile(
+                    title: const Text('إيراد اليوم كاش 💵'),
+                    trailing: Text('${totalCashRevenue.toStringAsFixed(2)} ج.م', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                  ),
+                  ListTile(
+                    title: const Text('إيراد اليوم فيزا 💳'),
+                    trailing: Text('${totalVisaRevenue.toStringAsFixed(2)} ج.م', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                  ),
+                  ListTile(
+                    title: const Text('إجمالي اليوم 📅'),
+                    trailing: Text('${totalRevenue.toStringAsFixed(2)} ج.م', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
             ),
@@ -379,4 +412,3 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
-            
