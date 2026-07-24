@@ -7,8 +7,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
+    debugPrint("Firebase connected successfully");
   } catch (e) {
-    debugPrint("Firebase init error: $e");
+    debugPrint("Firebase connection failed: $e");
   }
   runApp(const MangaPsApp());
 }
@@ -47,15 +48,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // مؤقت محلي لزيادة ثواني الأجهزة الشغالة وتحديث Firebase
+    // تحديث الثواني للأجهزة المفتوحة كل ثانية في الداتابيز
     timer = Timer.periodic(const Duration(seconds: 1), (t) async {
-      final devicesSnap = await _db.collection('devices').get();
-      for (var doc in devicesSnap.docs) {
-        if (doc.data()['isActive'] == true) {
-          _db.collection('devices').doc(doc.id).update({
-            'elapsedSeconds': FieldValue.increment(1),
-          });
+      try {
+        final devicesSnap = await _db.collection('devices').get();
+        for (var doc in devicesSnap.docs) {
+          if (doc.data()['isActive'] == true) {
+            _db.collection('devices').doc(doc.id).update({
+              'elapsedSeconds': FieldValue.increment(1),
+            });
+          }
         }
+      } catch (e) {
+        debugPrint("Timer update error: $e");
       }
     });
   }
@@ -127,13 +132,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () async {
-                // إضافة المبلغ للإيراد المناسب
                 String fieldToUpdate = (selectedPayment == 'كاش (نقداً)') ? 'totalCashRevenue' : 'totalVisaRevenue';
                 await _db.collection('settings').doc('financials').set({
                   fieldToUpdate: FieldValue.increment(cost),
                 }, SetOptions(merge: true));
 
-                // إعادة تصفية الجهاز
                 await _db.collection('devices').doc(deviceId).update({
                   'isActive': false,
                   'elapsedSeconds': 0,
@@ -202,13 +205,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   });
                   if (mounted) Navigator.pop(sheetContext);
                 },
-                child: const Text('حفظ الأسعار في Firebase'),
+                child: const Text('حفظ الأسعار'),
               ),
               const Divider(height: 30),
 
               // إضافة جهاز
               const Text('➕ إضافة جهاز جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الجهاز (مثال: طاولة 3)')),
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الجهاز (مثال: جهاز 3)')),
               DropdownButton<String>(
                 value: selectedType,
                 isExpanded: true,
@@ -258,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const Divider(height: 30),
 
-              // تصفية إيرادات اليوم
+              // تصفية اليوم
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade800),
                 icon: const Icon(Icons.refresh, color: Colors.orange),
@@ -268,7 +271,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'totalCashRevenue': 0.0,
                     'totalVisaRevenue': 0.0,
                   });
-                  // مسح المصاريف
                   var expensesDocs = await _db.collection('expenses').get();
                   for (var doc in expensesDocs.docs) {
                     await doc.reference.delete();
@@ -306,12 +308,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           body: ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              // عرض الأجهزة لحظياً من Firebase
               StreamBuilder<QuerySnapshot>(
                 stream: _db.collection('devices').snapshots(),
                 builder: (context, devicesSnap) {
                   if (!devicesSnap.hasData) return const Center(child: CircularProgressIndicator());
                   final docs = devicesSnap.data!.docs;
+
+                  if (docs.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: Text("لا يوجد أجهزة، افتح القائمة لإضافة أول جهاز."),
+                      ),
+                    );
+                  }
 
                   return Column(
                     children: docs.map((doc) {
@@ -406,7 +416,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const Text('📊 التقرير المالي', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.cyan)),
               const SizedBox(height: 10),
 
-              // عرض الحسابات والمصاريف لحظياً
               StreamBuilder<DocumentSnapshot>(
                 stream: _db.collection('settings').doc('financials').snapshots(),
                 builder: (context, finSnap) {
