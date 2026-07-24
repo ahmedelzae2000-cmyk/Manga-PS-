@@ -24,6 +24,18 @@ void main() async {
   runApp(const MangaPsApp());
 }
 
+// دالة مساعدة لحساب بداية اليوم الحسابي (12 ظهراً)
+DateTime getBusinessDayStart(DateTime date) {
+  if (date.hour < 12) {
+    // إذا كنا قبل الساعة 12 ظهراً، فنحن نتبع اليوم السابق بدءاً من 12 ظهراً
+    DateTime prev = date.subtract(const Duration(days: 1));
+    return DateTime(prev.year, prev.month, prev.day, 12, 0, 0);
+  } else {
+    // إذا كنا من 12 ظهراً وما بعد، فهذا بداية اليوم الحسابي الحالي
+    return DateTime(date.year, date.month, date.day, 12, 0, 0);
+  }
+}
+
 class MangaPsApp extends StatelessWidget {
   const MangaPsApp({super.key});
 
@@ -597,7 +609,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ----------------- 3. شاشة التقارير مع تعديل وحذف الفواتير -----------------
+// ----------------- 3. شاشة التقارير مع نظام اليوم (12 ظهراً) -----------------
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -678,8 +690,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget build(BuildContext context) {
     DateTime now = DateTime.now();
     DateTime startPeriod = isMonthly
-        ? DateTime(now.year, now.month, 1)
-        : DateTime(now.year, now.month, now.day);
+        ? DateTime(now.year, now.month, 1, 12, 0, 0)
+        : getBusinessDayStart(now); // 👈 يبدأ من 12 ظهراً للمنظومة الحسابية
 
     return Scaffold(
       appBar: AppBar(title: const Text('التقارير الحسابية والفواتير 📊')),
@@ -691,7 +703,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ChoiceChip(
-                  label: const Text('تقرير اليوم'),
+                  label: const Text('تقرير اليوم (12ظ - 12ظ)'),
                   selected: !isMonthly,
                   onSelected: (val) => setState(() => isMonthly = false),
                 ),
@@ -748,7 +760,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               padding: const EdgeInsets.all(20),
                               child: Column(
                                 children: [
-                                  Text(isMonthly ? 'صافي أرباح الشهر' : 'صافي أرباح اليوم', style: const TextStyle(fontSize: 18)),
+                                  Text(isMonthly ? 'صافي أرباح الشهر' : 'صافي أرباح اليوم (من 12 ظهراً)', style: const TextStyle(fontSize: 16)),
                                   const SizedBox(height: 10),
                                   Text('${netProfit.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
                                 ],
@@ -1086,12 +1098,15 @@ class _ShiftScreenState extends State<ShiftScreen> {
                 var docs = snapshot.data!.docs;
 
                 if (_selectedDate != null) {
+                  DateTime startFilter = getBusinessDayStart(_selectedDate!);
+                  DateTime endFilter = startFilter.add(const Duration(hours: 24));
+
                   docs = docs.where((doc) {
                     var data = doc.data() as Map<String, dynamic>;
                     Timestamp? ts = data['startTime'] as Timestamp?;
                     if (ts == null) return false;
                     DateTime dt = ts.toDate();
-                    return dt.year == _selectedDate!.year && dt.month == _selectedDate!.month && dt.day == _selectedDate!.day;
+                    return dt.isAfter(startFilter) && dt.isBefore(endFilter);
                   }).toList();
                 }
 
