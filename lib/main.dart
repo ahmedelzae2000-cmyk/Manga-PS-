@@ -149,7 +149,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ----------------- 1. شاشة الأجهزة -----------------
+// ----------------- 1. شاشة الأجهزة (محدثة لحفظ الوقت بدقة عند الخروج) -----------------
 class DevicesDashboardScreen extends StatefulWidget {
   const DevicesDashboardScreen({super.key});
 
@@ -159,40 +159,45 @@ class DevicesDashboardScreen extends StatefulWidget {
 
 class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  Timer? _timer;
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) async {
-      try {
-        final devicesSnap = await _db.collection('devices').get();
-        for (var doc in devicesSnap.docs) {
-          if (doc.data()['isActive'] == true) {
-            _db.collection('devices').doc(doc.id).update({
-              'elapsedSeconds': FieldValue.increment(1),
-            });
-          }
-        }
-      } catch (e) {
-        debugPrint("Timer Error: $e");
-      }
+    // مؤقت محلي فقط لإعادة تحديث الواجهة كل ثانية لرؤية الوقت يتحرك
+    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _ticker?.cancel();
     super.dispose();
   }
 
+  int _calculateElapsedSeconds(Map<String, dynamic> device) {
+    bool isActive = device['isActive'] ?? false;
+    int previousSeconds = (device['elapsedSeconds'] ?? 0).toInt();
+
+    if (!isActive) return previousSeconds;
+
+    Timestamp? startTimeTs = device['startTime'] as Timestamp?;
+    if (startTimeTs == null) return previousSeconds;
+
+    DateTime startTime = startTimeTs.toDate();
+    int currentRunSeconds = DateTime.now().difference(startTime).inSeconds;
+
+    return previousSeconds + currentRunSeconds;
+  }
+
   String formatTime(int seconds) {
-    final dur = Duration(seconds: seconds);
+    final dur = Duration(seconds: seconds < 0 ? 0 : seconds);
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     return "${twoDigits(dur.inHours)}:${twoDigits(dur.inMinutes.remainder(60))}:${twoDigits(dur.inSeconds.remainder(60))}";
   }
 
-  double calculateCost(Map<String, dynamic> device, Map<String, dynamic> rates) {
+  double calculateCost(Map<String, dynamic> device, Map<String, dynamic> rates, int totalSeconds) {
     double rate = 0;
     bool isMulti = device['isMulti'] ?? false;
     String type = device['type'] ?? 'PS4';
@@ -202,8 +207,27 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
     } else {
       rate = isMulti ? (rates['ps5MultiRate'] ?? 60.0) : (rates['ps5SingleRate'] ?? 40.0);
     }
-    int seconds = device['elapsedSeconds'] ?? 0;
-    return (seconds / 3600.0) * rate;
+    return (totalSeconds / 3600.0) * rate;
+  }
+
+  void _toggleDeviceState(String docId, Map<String, dynamic> device) async {
+    bool isActive = device['isActive'] ?? false;
+
+    if (!isActive) {
+      // تشغيل الجهاز: حفظ وقت البداية الحالي
+      await _db.collection('devices').doc(docId).update({
+        'isActive': true,
+        'startTime': FieldValue.serverTimestamp(),
+      });
+    } else {
+      // إيقاف مؤقت: حفظ إجمالي الثواني المنقضية حتى الآن وإلغاء وقت البداية
+      int totalSeconds = _calculateElapsedSeconds(device);
+      await _db.collection('devices').doc(docId).update({
+        'isActive': false,
+        'elapsedSeconds': totalSeconds,
+        'startTime': null,
+      });
+    }
   }
 
   void _showAddDeviceDialog() {
@@ -244,6 +268,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                   'isActive': false,
                   'isMulti': false,
                   'elapsedSeconds': 0,
+                  'startTime': null,
                 });
                 Navigator.pop(context);
               }
@@ -276,7 +301,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
     );
   }
 
-  void _showCheckoutDialog(String docId, Map<String, dynamic> device, double calculatedCost) {
+  void _showCheckoutDialog(String docId, Map<String, dynamic> device, int totalSeconds, double calculatedCost) {
     TextEditingController priceController = TextEditingController(text: calculatedCost.toStringAsFixed(2));
     String paymentMethod = 'كاش';
 
@@ -290,7 +315,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('الوقت المنقضي: ${formatTime(device['elapsedSeconds'] ?? 0)}'),
+                Text('الوقت المنقضي: ${formatTime(totalSeconds)}'),
                 const SizedBox(height: 15),
                 TextField(
                   controller: priceController,
@@ -325,7 +350,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
 
                   await _db.collection('invoices').add({
                     'deviceName': device['name'],
-                    'durationSeconds': device['elapsedSeconds'],
+                    'durationSeconds': totalSeconds,
                     'calculatedAmount': calculatedCost,
                     'finalAmount': finalAmount,
                     'paymentMethod': paymentMethod,
@@ -336,6 +361,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                   await _db.collection('devices').doc(docId).update({
                     'isActive': false,
                     'elapsedSeconds': 0,
+                    'startTime': null,
                     'isMulti': false,
                   });
 
@@ -395,7 +421,9 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                   String docId = docs[i].id;
                   bool isActive = device['isActive'] ?? false;
                   bool isMulti = device['isMulti'] ?? false;
-                  double cost = calculateCost(device, rates);
+
+                  int totalSeconds = _calculateElapsedSeconds(device);
+                  double cost = calculateCost(device, rates, totalSeconds);
 
                   return Card(
                     child: Padding(
@@ -415,7 +443,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                           ),
                           Chip(label: Text(device['type'] ?? 'PS4'), padding: EdgeInsets.zero),
                           Text(
-                            formatTime(device['elapsedSeconds'] ?? 0),
+                            formatTime(totalSeconds),
                             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isActive ? Colors.greenAccent : Colors.grey),
                           ),
                           Text('${cost.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16, color: Colors.amber, fontWeight: FontWeight.bold)),
@@ -440,15 +468,15 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(backgroundColor: isActive ? Colors.orange : Colors.green),
-                                  onPressed: () => _db.collection('devices').doc(docId).update({'isActive': !isActive}),
+                                  onPressed: () => _toggleDeviceState(docId, device),
                                   child: Text(isActive ? 'إيقاف' : 'تشغيل', style: const TextStyle(fontSize: 12)),
                                 ),
                               ),
-                              if (isActive || (device['elapsedSeconds'] ?? 0) > 0) ...[
+                              if (isActive || totalSeconds > 0) ...[
                                 const SizedBox(width: 4),
                                 IconButton(
                                   icon: const Icon(Icons.receipt_long, color: Colors.purpleAccent),
-                                  onPressed: () => _showCheckoutDialog(docId, device, cost),
+                                  onPressed: () => _showCheckoutDialog(docId, device, totalSeconds, cost),
                                 )
                               ]
                             ],
@@ -724,7 +752,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 }
 
-// ----------------- 4. شاشة إدارة الورديات مع خصم المصروفات -----------------
+// ----------------- 4. شاشة إدارة الورديات -----------------
 class ShiftScreen extends StatefulWidget {
   const ShiftScreen({super.key});
 
@@ -841,7 +869,6 @@ class _ShiftScreenState extends State<ShiftScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // قسم الوردية الحالية
             StreamBuilder<QuerySnapshot>(
               stream: _db.collection('shifts').where('isOpen', isEqualTo: true).snapshots(),
               builder: (context, snapshot) {
@@ -959,7 +986,6 @@ class _ShiftScreenState extends State<ShiftScreen> {
             ),
             const SizedBox(height: 10),
 
-            // قائمة الورديات المغلقة والقديمة
             StreamBuilder<QuerySnapshot>(
               stream: _db.collection('shifts').where('isOpen', isEqualTo: false).orderBy('startTime', descending: true).snapshots(),
               builder: (context, snapshot) {
