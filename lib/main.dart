@@ -149,7 +149,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ----------------- 1. شاشة الأجهزة (إضافة، تعديل سعر، دفع، وحذف) -----------------
+// ----------------- 1. شاشة الأجهزة -----------------
 class DevicesDashboardScreen extends StatefulWidget {
   const DevicesDashboardScreen({super.key});
 
@@ -320,7 +320,6 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                 onPressed: () async {
                   double finalAmount = double.tryParse(priceController.text) ?? calculatedCost;
 
-                  // إيجاد الوردية المفتوحة حالياً
                   var activeShift = await _db.collection('shifts').where('isOpen', isEqualTo: true).get();
                   String? shiftId = activeShift.docs.isNotEmpty ? activeShift.docs.first.id : null;
 
@@ -573,7 +572,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ----------------- 3. شاشة التقارير اليومية والشهرية -----------------
+// ----------------- 3. شاشة التقارير -----------------
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -593,9 +592,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         : DateTime(now.year, now.month, now.day);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('التقارير الحسابية 📊'),
-      ),
+      appBar: AppBar(title: const Text('التقارير الحسابية 📊')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -727,7 +724,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 }
 
-// ----------------- 4. شاشة إدارة الورديات -----------------
+// ----------------- 4. شاشة إدارة الورديات مع خصم المصروفات -----------------
 class ShiftScreen extends StatefulWidget {
   const ShiftScreen({super.key});
 
@@ -737,6 +734,7 @@ class ShiftScreen extends StatefulWidget {
 
 class _ShiftScreenState extends State<ShiftScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  DateTime? _selectedDate;
 
   void _startShift() {
     TextEditingController cashCtrl = TextEditingController(text: '0');
@@ -768,71 +766,272 @@ class _ShiftScreenState extends State<ShiftScreen> {
     );
   }
 
-  void _closeShift(String shiftId) async {
-    await _db.collection('shifts').doc(shiftId).update({
-      'isOpen': false,
-      'endTime': FieldValue.serverTimestamp(),
-    });
+  void _closeShift(String shiftId, double totalIncome, double totalExpenses, double netCashInDrawer) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد إغلاق الوردية'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('إجمالي الدخل: ${totalIncome.toStringAsFixed(2)} ج.م'),
+            Text('إجمالي المصروفات: ${totalExpenses.toStringAsFixed(2)} ج.م'),
+            const Divider(),
+            Text('الصافي المتوقع بالدرج: ${netCashInDrawer.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              await _db.collection('shifts').doc(shiftId).update({
+                'isOpen': false,
+                'endTime': FieldValue.serverTimestamp(),
+                'totalIncome': totalIncome,
+                'totalExpenses': totalExpenses,
+                'netProfit': totalIncome - totalExpenses,
+                'expectedDrawerCash': netCashInDrawer,
+              });
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('إغلاق وتسليم الوردية'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(Timestamp? ts) {
+    if (ts == null) return 'غير محدد';
+    DateTime dt = ts.toDate();
+    return "${dt.year}/${dt.month}/${dt.day}  ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}";
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('إدارة الورديات ⏱️')),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _db.collection('shifts').where('isOpen', isEqualTo: true).snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      appBar: AppBar(
+        title: const Text('إدارة والورديات ⏱️'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.date_range, color: Colors.purpleAccent),
+            onPressed: () async {
+              DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate ?? DateTime.now(),
+                firstDate: DateTime(2023),
+                lastDate: DateTime(2030),
+              );
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+          ),
+          if (_selectedDate != null)
+            IconButton(
+              icon: const Icon(Icons.clear, color: Colors.redAccent),
+              onPressed: () => setState(() => _selectedDate = null),
+            ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // قسم الوردية الحالية
+            StreamBuilder<QuerySnapshot>(
+              stream: _db.collection('shifts').where('isOpen', isEqualTo: true).snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const CircularProgressIndicator();
 
-          if (snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('لا توجد وردية مفتوحة حالياً', style: TextStyle(fontSize: 18)),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
-                    onPressed: _startShift,
-                    child: const Text('فتح وردية جديدة الآن', style: TextStyle(fontSize: 16)),
-                  )
-                ],
-              ),
-            );
-          }
-
-          var shiftData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-          String shiftId = snapshot.data!.docs.first.id;
-          double startCash = (shiftData['startCash'] ?? 0).toDouble();
-
-          return Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Card(
-                  color: Colors.green.shade900,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        const Text('الوردية الحالية نشطة 🟢', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        Text('عهد بداية الوردية: $startCash ج.م', style: const TextStyle(fontSize: 16)),
-                      ],
+                if (snapshot.data!.docs.isEmpty) {
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          const Text('لا توجد وردية مفتوحة حالياً', style: TextStyle(fontSize: 16)),
+                          const SizedBox(height: 15),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                            onPressed: _startShift,
+                            child: const Text('فتح وردية جديدة الآن'),
+                          )
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.all(15)),
-                  onPressed: () => _closeShift(shiftId),
-                  child: const Text('إغلاق وتسليم الوردية', style: TextStyle(fontSize: 16)),
+                  );
+                }
+
+                var shiftData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+                String shiftId = snapshot.data!.docs.first.id;
+                double startCash = (shiftData['startCash'] ?? 0).toDouble();
+
+                return StreamBuilder<QuerySnapshot>(
+                  stream: _db.collection('invoices').where('shiftId', isEqualTo: shiftId).snapshots(),
+                  builder: (context, invoicesSnap) {
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: _db.collection('expenses').where('shiftId', isEqualTo: shiftId).snapshots(),
+                      builder: (context, expensesSnap) {
+                        double currentIncome = 0;
+                        double currentExpenses = 0;
+
+                        if (invoicesSnap.hasData) {
+                          for (var doc in invoicesSnap.data!.docs) {
+                            currentIncome += ((doc.data() as Map<String, dynamic>)['finalAmount'] ?? 0).toDouble();
+                          }
+                        }
+
+                        if (expensesSnap.hasData) {
+                          for (var doc in expensesSnap.data!.docs) {
+                            currentExpenses += ((doc.data() as Map<String, dynamic>)['amount'] ?? 0).toDouble();
+                          }
+                        }
+
+                        double netProfit = currentIncome - currentExpenses;
+                        double netDrawerCash = startCash + netProfit;
+
+                        return Card(
+                          color: Colors.green.shade900,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                const Text('الوردية الحالية نشطة 🟢', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 5),
+                                Text('بداية الوردية: ${_formatTimestamp(shiftData['startTime'] as Timestamp?)}'),
+                                Text('عهد البداية: $startCash ج.م'),
+                                const Divider(height: 20, color: Colors.white24),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                  children: [
+                                    Column(
+                                      children: [
+                                        const Text('الدخل', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        Text('${currentIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                                      ],
+                                    ),
+                                    Column(
+                                      children: [
+                                        const Text('المصروفات', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        Text('${currentExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                                      ],
+                                    ),
+                                    Column(
+                                      children: [
+                                        const Text('الصافي بالدرج', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        Text('${netDrawerCash.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 15),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                  onPressed: () => _closeShift(shiftId, currentIncome, currentExpenses, netDrawerCash),
+                                  child: const Text('إغلاق وتسليم الوردية'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+
+            const SizedBox(height: 25),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _selectedDate == null
+                      ? 'سجل الورديات السابقة 📜'
+                      : 'تصفية تاريخ: ${_selectedDate!.year}/${_selectedDate!.month}/${_selectedDate!.day}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purpleAccent),
                 ),
               ],
             ),
-          );
-        },
+            const SizedBox(height: 10),
+
+            // قائمة الورديات المغلقة والقديمة
+            StreamBuilder<QuerySnapshot>(
+              stream: _db.collection('shifts').where('isOpen', isEqualTo: false).orderBy('startTime', descending: true).snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+                var docs = snapshot.data!.docs;
+
+                if (_selectedDate != null) {
+                  docs = docs.where((doc) {
+                    var data = doc.data() as Map<String, dynamic>;
+                    Timestamp? ts = data['startTime'] as Timestamp?;
+                    if (ts == null) return false;
+                    DateTime dt = ts.toDate();
+                    return dt.year == _selectedDate!.year && dt.month == _selectedDate!.month && dt.day == _selectedDate!.day;
+                  }).toList();
+                }
+
+                if (docs.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Center(child: Text('لا توجد ورديات سابقة مسجلة')),
+                  );
+                }
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: docs.length,
+                  itemBuilder: (context, i) {
+                    var shift = docs[i].data() as Map<String, dynamic>;
+                    double totalInc = (shift['totalIncome'] ?? 0).toDouble();
+                    double totalExp = (shift['totalExpenses'] ?? 0).toDouble();
+                    double net = (shift['netProfit'] ?? 0).toDouble();
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ExpansionTile(
+                        leading: const CircleAvatar(child: Icon(Icons.history)),
+                        title: Text('بداية: ${_formatTimestamp(shift['startTime'] as Timestamp?)}'),
+                        subtitle: Text('الصافي: $net ج.م  |  المصروفات: $totalExp ج.م'),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('عهد البداية: ${shift['startCash'] ?? 0} ج.م'),
+                                    Text('إجمالي الدخل: $totalInc ج.م', style: const TextStyle(color: Colors.greenAccent)),
+                                  ],
+                                ),
+                                const SizedBox(height: 5),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('المصروفات المخصومة: $totalExp ج.م', style: const TextStyle(color: Colors.redAccent)),
+                                    Text('صافي الدرج عند الغلق: ${shift['expectedDrawerCash'] ?? 0} ج.م', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
