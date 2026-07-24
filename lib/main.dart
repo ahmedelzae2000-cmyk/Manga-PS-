@@ -122,6 +122,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = [
     const DevicesDashboardScreen(),
     const ExpensesScreen(),
+    const ReportsScreen(),
+    const ShiftScreen(),
     const SettingsScreen(),
   ];
 
@@ -132,10 +134,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: Colors.purpleAccent,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'المصروفات'),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'التقارير'),
+          BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'الوردية'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
         ],
       ),
@@ -143,7 +149,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ----------------- 1. شاشة إدارة الأجهزة والجلسات -----------------
+// ----------------- 1. شاشة الأجهزة (إضافة، تعديل سعر، دفع، وحذف) -----------------
 class DevicesDashboardScreen extends StatefulWidget {
   const DevicesDashboardScreen({super.key});
 
@@ -249,38 +255,61 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
     );
   }
 
+  void _deleteDevice(String docId, String name) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('حذف $name؟'),
+        content: const Text('هل أنت تأكد من إزالة هذا الجهاز نهائياً؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              await _db.collection('devices').doc(docId).delete();
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('حذف الجهاز'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCheckoutDialog(String docId, Map<String, dynamic> device, double calculatedCost) {
-    TextEditingController discountController = TextEditingController(text: '0');
+    TextEditingController priceController = TextEditingController(text: calculatedCost.toStringAsFixed(2));
+    String paymentMethod = 'كاش';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          double discount = double.tryParse(discountController.text) ?? 0.0;
-          double finalAmount = (calculatedCost - discount) < 0 ? 0 : (calculatedCost - discount);
-
           return AlertDialog(
             title: Text('إنهاء جلسة: ${device['name']}'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('المدُة: ${formatTime(device['elapsedSeconds'] ?? 0)}'),
-                Text('الحساب الأساسي: ${calculatedCost.toStringAsFixed(2)} ج.م'),
+                Text('الوقت المنقضي: ${formatTime(device['elapsedSeconds'] ?? 0)}'),
                 const SizedBox(height: 15),
                 TextField(
-                  controller: discountController,
+                  controller: priceController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'خصم / تعديل فاتورة (ج.م)',
+                    labelText: 'المبلغ النهائي (تعديل السعر ج.م)',
                     border: OutlineInputBorder(),
+                    suffixText: 'ج.م',
                   ),
-                  onChanged: (val) => setDialogState(() {}),
                 ),
                 const SizedBox(height: 15),
-                Text(
-                  'المبلغ النهائي: ${finalAmount.toStringAsFixed(2)} ج.م',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+                DropdownButtonFormField<String>(
+                  value: paymentMethod,
+                  items: const [
+                    DropdownMenuItem(value: 'كاش', child: Text('نقداً (كاش)')),
+                    DropdownMenuItem(value: 'فيزا/محفظة', child: Text('دفع إلكتروني (فيزا/فودافون كاش)')),
+                  ],
+                  onChanged: (val) => setDialogState(() => paymentMethod = val!),
+                  decoration: const InputDecoration(labelText: 'طريقة الدفع'),
                 ),
               ],
             ),
@@ -289,26 +318,31 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
                 onPressed: () async {
-                  // حفظ الفاتورة في السجل
+                  double finalAmount = double.tryParse(priceController.text) ?? calculatedCost;
+
+                  // إيجاد الوردية المفتوحة حالياً
+                  var activeShift = await _db.collection('shifts').where('isOpen', isEqualTo: true).get();
+                  String? shiftId = activeShift.docs.isNotEmpty ? activeShift.docs.first.id : null;
+
                   await _db.collection('invoices').add({
                     'deviceName': device['name'],
                     'durationSeconds': device['elapsedSeconds'],
-                    'originalAmount': calculatedCost,
-                    'discount': discount,
+                    'calculatedAmount': calculatedCost,
                     'finalAmount': finalAmount,
+                    'paymentMethod': paymentMethod,
+                    'shiftId': shiftId,
                     'timestamp': FieldValue.serverTimestamp(),
                   });
 
-                  // إعادة تصفير الجهاز وإيقافه
                   await _db.collection('devices').doc(docId).update({
                     'isActive': false,
                     'elapsedSeconds': 0,
                     'isMulti': false,
                   });
 
-                  Navigator.pop(context);
+                  if (mounted) Navigator.pop(context);
                 },
-                child: const Text('إنهاء الفاتورة وحفظ'),
+                child: const Text('حفظ وتسجيل الفاتورة'),
               ),
             ],
           );
@@ -352,7 +386,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                 padding: const EdgeInsets.all(12),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 0.75,
+                  childAspectRatio: 0.68,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                 ),
@@ -366,39 +400,39 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
 
                   return Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(device['name'] ?? 'جهاز', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Chip(label: Text(device['type'] ?? 'PS4'), padding: EdgeInsets.zero),
+                              Text(device['name'] ?? 'جهاز', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                onPressed: () => _deleteDevice(docId, device['name'] ?? 'الجهاز'),
+                              ),
                             ],
                           ),
+                          Chip(label: Text(device['type'] ?? 'PS4'), padding: EdgeInsets.zero),
                           Text(
                             formatTime(device['elapsedSeconds'] ?? 0),
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isActive ? Colors.greenAccent : Colors.grey),
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isActive ? Colors.greenAccent : Colors.grey),
                           ),
-                          Text('${cost.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16, color: Colors.amber)),
+                          Text('${cost.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16, color: Colors.amber, fontWeight: FontWeight.bold)),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               ChoiceChip(
-                                label: const Text('فردي'),
+                                label: const Text('فردي', style: TextStyle(fontSize: 12)),
                                 selected: !isMulti,
-                                onSelected: (val) {
-                                  _db.collection('devices').doc(docId).update({'isMulti': false});
-                                },
+                                onSelected: (val) => _db.collection('devices').doc(docId).update({'isMulti': false}),
                               ),
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                               ChoiceChip(
-                                label: const Text('زوجي'),
+                                label: const Text('زوجي', style: TextStyle(fontSize: 12)),
                                 selected: isMulti,
-                                onSelected: (val) {
-                                  _db.collection('devices').doc(docId).update({'isMulti': true});
-                                },
+                                onSelected: (val) => _db.collection('devices').doc(docId).update({'isMulti': true}),
                               ),
                             ],
                           ),
@@ -407,16 +441,14 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(backgroundColor: isActive ? Colors.orange : Colors.green),
-                                  onPressed: () {
-                                    _db.collection('devices').doc(docId).update({'isActive': !isActive});
-                                  },
-                                  child: Text(isActive ? 'إيقاف' : 'تشغيل'),
+                                  onPressed: () => _db.collection('devices').doc(docId).update({'isActive': !isActive}),
+                                  child: Text(isActive ? 'إيقاف' : 'تشغيل', style: const TextStyle(fontSize: 12)),
                                 ),
                               ),
                               if (isActive || (device['elapsedSeconds'] ?? 0) > 0) ...[
-                                const SizedBox(width: 5),
+                                const SizedBox(width: 4),
                                 IconButton(
-                                  icon: const Icon(Icons.check_circle, color: Colors.purpleAccent),
+                                  icon: const Icon(Icons.receipt_long, color: Colors.purpleAccent),
                                   onPressed: () => _showCheckoutDialog(docId, device, cost),
                                 )
                               ]
@@ -436,7 +468,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
   }
 }
 
-// ----------------- 2. شاشة المصروفات والإنفاق -----------------
+// ----------------- 2. شاشة المصروفات -----------------
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
 
@@ -460,7 +492,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              decoration: const InputDecoration(labelText: 'بند المصروف (مثال: دراعات/كهرباء)'),
+              decoration: const InputDecoration(labelText: 'بند المصروف'),
               onChanged: (val) => title = val,
             ),
             TextField(
@@ -484,15 +516,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (title.isNotEmpty && amount > 0) {
-                _db.collection('expenses').add({
+                var activeShift = await _db.collection('shifts').where('isOpen', isEqualTo: true).get();
+                String? shiftId = activeShift.docs.isNotEmpty ? activeShift.docs.first.id : null;
+
+                await _db.collection('expenses').add({
                   'title': title,
                   'amount': amount,
                   'category': category,
+                  'shiftId': shiftId,
                   'timestamp': FieldValue.serverTimestamp(),
                 });
-                Navigator.pop(context);
+                if (mounted) Navigator.pop(context);
               }
             },
             child: const Text('حفظ المصروف'),
@@ -537,7 +573,272 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ----------------- 3. شاشة إعدادات الأسعار -----------------
+// ----------------- 3. شاشة التقارير اليومية والشهرية -----------------
+class ReportsScreen extends StatefulWidget {
+  const ReportsScreen({super.key});
+
+  @override
+  State<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _ReportsScreenState extends State<ReportsScreen> {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  bool isMonthly = false;
+
+  @override
+  Widget build(BuildContext context) {
+    DateTime now = DateTime.now();
+    DateTime startPeriod = isMonthly
+        ? DateTime(now.year, now.month, 1)
+        : DateTime(now.year, now.month, now.day);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('التقارير الحسابية 📊'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ChoiceChip(
+                  label: const Text('تقرير اليوم'),
+                  selected: !isMonthly,
+                  onSelected: (val) => setState(() => isMonthly = false),
+                ),
+                const SizedBox(width: 15),
+                ChoiceChip(
+                  label: const Text('تقرير الشهر'),
+                  selected: isMonthly,
+                  onSelected: (val) => setState(() => isMonthly = true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _db.collection('invoices').where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startPeriod)).snapshots(),
+                builder: (context, invoicesSnap) {
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: _db.collection('expenses').where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startPeriod)).snapshots(),
+                    builder: (context, expensesSnap) {
+                      if (!invoicesSnap.hasData || !expensesSnap.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      double totalIncome = 0;
+                      double cashIncome = 0;
+                      double visaIncome = 0;
+
+                      for (var doc in invoicesSnap.data!.docs) {
+                        var data = doc.data() as Map<String, dynamic>;
+                        double amount = (data['finalAmount'] ?? 0).toDouble();
+                        totalIncome += amount;
+                        if (data['paymentMethod'] == 'فيزا/محفظة') {
+                          visaIncome += amount;
+                        } else {
+                          cashIncome += amount;
+                        }
+                      }
+
+                      double totalExpenses = 0;
+                      for (var doc in expensesSnap.data!.docs) {
+                        var data = doc.data() as Map<String, dynamic>;
+                        totalExpenses += (data['amount'] ?? 0).toDouble();
+                      }
+
+                      double netProfit = totalIncome - totalExpenses;
+
+                      return ListView(
+                        children: [
+                          Card(
+                            color: Colors.purple.shade900,
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                children: [
+                                  Text(isMonthly ? 'صافي أرباح الشهر' : 'صافي أرباح اليوم', style: const TextStyle(fontSize: 18)),
+                                  const SizedBox(height: 10),
+                                  Text('${netProfit.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(15),
+                                    child: Column(
+                                      children: [
+                                        const Text('إجمالي الدخل'),
+                                        Text('${totalIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 18, color: Colors.green)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(15),
+                                    child: Column(
+                                      children: [
+                                        const Text('إجمالي المصروفات'),
+                                        Text('${totalExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 18, color: Colors.redAccent)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 30),
+                          ListTile(
+                            leading: const Icon(Icons.money, color: Colors.green),
+                            title: const Text('المقبوضات النقذية (كاش)'),
+                            trailing: Text('${cashIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16)),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.credit_card, color: Colors.blue),
+                            title: const Text('المقبوضات الإلكترونية (فيزا/محفظة)'),
+                            trailing: Text('${visaIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16)),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.receipt, color: Colors.orange),
+                            title: const Text('عدد الفواتير'),
+                            trailing: Text('${invoicesSnap.data!.docs.length}', style: const TextStyle(fontSize: 16)),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ----------------- 4. شاشة إدارة الورديات -----------------
+class ShiftScreen extends StatefulWidget {
+  const ShiftScreen({super.key});
+
+  @override
+  State<ShiftScreen> createState() => _ShiftScreenState();
+}
+
+class _ShiftScreenState extends State<ShiftScreen> {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  void _startShift() {
+    TextEditingController cashCtrl = TextEditingController(text: '0');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('فتح وردية جديدة'),
+        content: TextField(
+          controller: cashCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'مبلغ درج الكاش للبداية (الدرج)'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () async {
+              await _db.collection('shifts').add({
+                'isOpen': true,
+                'startCash': double.tryParse(cashCtrl.text) ?? 0,
+                'startTime': FieldValue.serverTimestamp(),
+              });
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('بدء الوردية'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _closeShift(String shiftId) async {
+    await _db.collection('shifts').doc(shiftId).update({
+      'isOpen': false,
+      'endTime': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('إدارة الورديات ⏱️')),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _db.collection('shifts').where('isOpen', isEqualTo: true).snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+          if (snapshot.data!.docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('لا توجد وردية مفتوحة حالياً', style: TextStyle(fontSize: 18)),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
+                    onPressed: _startShift,
+                    child: const Text('فتح وردية جديدة الآن', style: TextStyle(fontSize: 16)),
+                  )
+                ],
+              ),
+            );
+          }
+
+          var shiftData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+          String shiftId = snapshot.data!.docs.first.id;
+          double startCash = (shiftData['startCash'] ?? 0).toDouble();
+
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  color: Colors.green.shade900,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        const Text('الوردية الحالية نشطة 🟢', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        Text('عهد بداية الوردية: $startCash ج.م', style: const TextStyle(fontSize: 16)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.all(15)),
+                  onPressed: () => _closeShift(shiftId),
+                  child: const Text('إغلاق وتسليم الوردية', style: TextStyle(fontSize: 16)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ----------------- 5. شاشة إعدادات الأسعار -----------------
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -603,4 +904,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
- 
