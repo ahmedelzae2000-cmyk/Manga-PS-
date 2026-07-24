@@ -149,7 +149,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ----------------- 1. شاشة الأجهزة (محدثة لحفظ الوقت بدقة عند الخروج) -----------------
+// ----------------- 1. شاشة الأجهزة -----------------
 class DevicesDashboardScreen extends StatefulWidget {
   const DevicesDashboardScreen({super.key});
 
@@ -164,7 +164,6 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // مؤقت محلي فقط لإعادة تحديث الواجهة كل ثانية لرؤية الوقت يتحرك
     _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
     });
@@ -214,13 +213,11 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
     bool isActive = device['isActive'] ?? false;
 
     if (!isActive) {
-      // تشغيل الجهاز: حفظ وقت البداية الحالي
       await _db.collection('devices').doc(docId).update({
         'isActive': true,
         'startTime': FieldValue.serverTimestamp(),
       });
     } else {
-      // إيقاف مؤقت: حفظ إجمالي الثواني المنقضية حتى الآن وإلغاء وقت البداية
       int totalSeconds = _calculateElapsedSeconds(device);
       await _db.collection('devices').doc(docId).update({
         'isActive': false,
@@ -600,7 +597,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ----------------- 3. شاشة التقارير -----------------
+// ----------------- 3. شاشة التقارير مع تعديل وحذف الفواتير -----------------
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -612,6 +609,71 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   bool isMonthly = false;
 
+  void _editInvoice(String docId, Map<String, dynamic> invoice) {
+    TextEditingController amountCtrl = TextEditingController(text: (invoice['finalAmount'] ?? 0).toString());
+    String method = invoice['paymentMethod'] ?? 'كاش';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text('تعديل فاتورة: ${invoice['deviceName'] ?? ''}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'المبلغ المعدل (ج.م)'),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: method,
+                  items: const [
+                    DropdownMenuItem(value: 'كاش', child: Text('نقداً (كاش)')),
+                    DropdownMenuItem(value: 'فيزا/محفظة', child: Text('دفع إلكتروني (فيزا/فودافون كاش)')),
+                  ],
+                  onChanged: (val) => setDialogState(() => method = val!),
+                  decoration: const InputDecoration(labelText: 'طريقة الدفع'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                onPressed: () async {
+                  await _db.collection('invoices').doc(docId).delete();
+                  if (mounted) Navigator.pop(context);
+                },
+                child: const Text('حذف الفاتورة'),
+              ),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+              ElevatedButton(
+                onPressed: () async {
+                  double? newAmount = double.tryParse(amountCtrl.text);
+                  if (newAmount != null) {
+                    await _db.collection('invoices').doc(docId).update({
+                      'finalAmount': newAmount,
+                      'paymentMethod': method,
+                    });
+                    if (mounted) Navigator.pop(context);
+                  }
+                },
+                child: const Text('تحديث'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatDuration(int seconds) {
+    int mins = (seconds / 60).round();
+    return '$mins دقيقة';
+  }
+
   @override
   Widget build(BuildContext context) {
     DateTime now = DateTime.now();
@@ -620,7 +682,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         : DateTime(now.year, now.month, now.day);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('التقارير الحسابية 📊')),
+      appBar: AppBar(title: const Text('التقارير الحسابية والفواتير 📊')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -641,10 +703,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: _db.collection('invoices').where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startPeriod)).snapshots(),
+                stream: _db.collection('invoices').where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startPeriod)).orderBy('timestamp', descending: true).snapshots(),
                 builder: (context, invoicesSnap) {
                   return StreamBuilder<QuerySnapshot>(
                     stream: _db.collection('expenses').where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startPeriod)).snapshots(),
@@ -657,7 +719,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       double cashIncome = 0;
                       double visaIncome = 0;
 
-                      for (var doc in invoicesSnap.data!.docs) {
+                      final invoices = invoicesSnap.data!.docs;
+
+                      for (var doc in invoices) {
                         var data = doc.data() as Map<String, dynamic>;
                         double amount = (data['finalAmount'] ?? 0).toDouble();
                         totalIncome += amount;
@@ -697,11 +761,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               Expanded(
                                 child: Card(
                                   child: Padding(
-                                    padding: const EdgeInsets.all(15),
+                                    padding: const EdgeInsets.all(12),
                                     child: Column(
                                       children: [
-                                        const Text('إجمالي الدخل'),
-                                        Text('${totalIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 18, color: Colors.green)),
+                                        const Text('إجمالي الدخل', style: TextStyle(fontSize: 12)),
+                                        Text('${totalIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.bold)),
                                       ],
                                     ),
                                   ),
@@ -710,11 +774,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               Expanded(
                                 child: Card(
                                   child: Padding(
-                                    padding: const EdgeInsets.all(15),
+                                    padding: const EdgeInsets.all(12),
                                     child: Column(
                                       children: [
-                                        const Text('إجمالي المصروفات'),
-                                        Text('${totalExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 18, color: Colors.redAccent)),
+                                        const Text('إجمالي المصروفات', style: TextStyle(fontSize: 12)),
+                                        Text('${totalExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16, color: Colors.redAccent, fontWeight: FontWeight.bold)),
                                       ],
                                     ),
                                   ),
@@ -722,22 +786,50 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               ),
                             ],
                           ),
-                          const Divider(height: 30),
-                          ListTile(
-                            leading: const Icon(Icons.money, color: Colors.green),
-                            title: const Text('المقبوضات النقذية (كاش)'),
-                            trailing: Text('${cashIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16)),
+                          const Divider(height: 25),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('سجل الفواتير (${invoices.length}) 🧾', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purpleAccent)),
+                              Text('كاش: $cashIncome | فيزا: $visaIncome', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            ],
                           ),
-                          ListTile(
-                            leading: const Icon(Icons.credit_card, color: Colors.blue),
-                            title: const Text('المقبوضات الإلكترونية (فيزا/محفظة)'),
-                            trailing: Text('${visaIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16)),
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.receipt, color: Colors.orange),
-                            title: const Text('عدد الفواتير'),
-                            trailing: Text('${invoicesSnap.data!.docs.length}', style: const TextStyle(fontSize: 16)),
-                          ),
+                          const SizedBox(height: 10),
+                          if (invoices.isEmpty)
+                            const Center(child: Padding(padding: EdgeInsets.all(20), child: Text("لا توجد فواتير مسجلة للفترة")))
+                          else
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: invoices.length,
+                              itemBuilder: (context, index) {
+                                var invDoc = invoices[index];
+                                var inv = invDoc.data() as Map<String, dynamic>;
+                                String invId = invDoc.id;
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: inv['paymentMethod'] == 'فيزا/محفظة' ? Colors.blue.shade800 : Colors.green.shade800,
+                                      child: Icon(inv['paymentMethod'] == 'فيزا/محفظة' ? Icons.credit_card : Icons.money, size: 20, color: Colors.white),
+                                    ),
+                                    title: Text(inv['deviceName'] ?? 'جهاز'),
+                                    subtitle: Text('المدة: ${_formatDuration(inv['durationSeconds'] ?? 0)} • ${inv['paymentMethod']}'),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text('${inv['finalAmount']} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.amber)),
+                                        IconButton(
+                                          icon: const Icon(Icons.edit, size: 18, color: Colors.purpleAccent),
+                                          onPressed: () => _editInvoice(invId, inv),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                         ],
                       );
                     },
