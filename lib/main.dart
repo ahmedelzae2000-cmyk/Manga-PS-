@@ -2,22 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
-  // 1. ضمان تهيئة محرك فلاتر
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. محاولة تهيئة Firebase مع عدم السماح للتطبيق بتعليق الشاشة
   try {
     await Firebase.initializeApp();
   } catch (e) {
-    debugPrint("Firebase init failed: $e");
+    debugPrint("Firebase init error: $e");
   }
 
-  // 3. فتح التطبيق والواجهة فوراً
-  runApp(const MyApp());
+  runApp(const MangaPsApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MangaPsApp extends StatelessWidget {
+  const MangaPsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -25,30 +22,97 @@ class MyApp extends StatelessWidget {
       title: 'Manga PS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF673AB7),
+          brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: const DashboardScreen(),
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manga PS'),
+        title: const Text(
+          'Manga PS - إدارة الصالة',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {},
+          ),
+        ],
       ),
-      body: const Center(
-        child: Text(
-          'أهلاً بك في تطبيق Manga PS! 🚀',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'الأجهزة المتاحة',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: 5, // عدد الأجهزة التجريبي
+                itemBuilder: (context, index) {
+                  final deviceNumber = index + 1;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16),
+                      leading: CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        child: Text(
+                          'PS $deviceNumber',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        'جهاز رقم $deviceNumber',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: const Text('الحالة: متوقف (متاح)'),
+                      trailing: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          // بدء جلسة جديدة
+                        },
+                        child: const Text('بدء جلسة'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+ 
