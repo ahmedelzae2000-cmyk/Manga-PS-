@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // معالجة أي خطأ في الـ Render عشان متظهرش شاشة رمادية أو بيضاء أبداً
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return Scaffold(
       body: Center(
@@ -39,7 +38,6 @@ class MangaPsApp extends StatelessWidget {
   }
 }
 
-// شاشة وسيطة مخصصة فقط لتهيئة الفايربيز بدون أي استدعاء مبكر
 class FirebaseLoaderScreen extends StatefulWidget {
   const FirebaseLoaderScreen({super.key});
 
@@ -53,7 +51,16 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
   @override
   void initState() {
     super.initState();
-    _initialization = Firebase.initializeApp();
+    // إدخال الإعدادات مباشرة لتجاوز خطأ الـ PlatformException
+    _initialization = Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "AIzaSyCY8JW1ZEpzcvS...", // 👈 ضع الـ current_key المكتوب في google-services.json بالكامل
+        appId: "1:49681326088:android:...", // 👈 ضع الـ mobilesdk_app_id المكتوب في google-services.json بالكامل
+        messagingSenderId: "49681326088",
+        projectId: "manga-ps",
+        storageBucket: "manga-ps.firebasestorage.app",
+      ),
+    );
   }
 
   @override
@@ -61,7 +68,6 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
     return FutureBuilder<FirebaseApp>(
       future: _initialization,
       builder: (context, snapshot) {
-        // لو حصل خطأ في تهيئة الفايربيز هيعرضه نصياً فوراً
         if (snapshot.hasError) {
           return Scaffold(
             body: Center(
@@ -77,12 +83,10 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
           );
         }
 
-        // أول ما يتصل بنجاح، يفتح الشاشة الرئيسية
         if (snapshot.connectionState == ConnectionState.done) {
           return const DashboardScreen();
         }
 
-        // أثناء التحميل
         return const Scaffold(
           body: Center(
             child: Column(
@@ -90,7 +94,7 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
               children: [
                 CircularProgressIndicator(color: Colors.purpleAccent),
                 SizedBox(height: 20),
-                Text("جاري تحميل Manga PS..."),
+                Text("جاري الاتصال بـ Manga PS..."),
               ],
             ),
           ),
@@ -116,7 +120,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _db = FirebaseFirestore.instance;
 
-    // المؤقت مش هيشتغل إلا بعد ما نضمن إننا جوه الـ Dashboard بعد تهيئة الفايربيز
     timer = Timer.periodic(const Duration(seconds: 1), (t) async {
       try {
         final devicesSnap = await _db.collection('devices').get();
