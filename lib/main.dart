@@ -27,11 +27,9 @@ void main() async {
 // دالة مساعدة لحساب بداية اليوم الحسابي (12 ظهراً)
 DateTime getBusinessDayStart(DateTime date) {
   if (date.hour < 12) {
-    // إذا كنا قبل الساعة 12 ظهراً، فنحن نتبع اليوم السابق بدءاً من 12 ظهراً
     DateTime prev = date.subtract(const Duration(days: 1));
     return DateTime(prev.year, prev.month, prev.day, 12, 0, 0);
   } else {
-    // إذا كنا من 12 ظهراً وما بعد، فهذا بداية اليوم الحسابي الحالي
     return DateTime(date.year, date.month, date.day, 12, 0, 0);
   }
 }
@@ -691,7 +689,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     DateTime now = DateTime.now();
     DateTime startPeriod = isMonthly
         ? DateTime(now.year, now.month, 1, 12, 0, 0)
-        : getBusinessDayStart(now); // 👈 يبدأ من 12 ظهراً للمنظومة الحسابية
+        : getBusinessDayStart(now);
 
     return Scaffold(
       appBar: AppBar(title: const Text('التقارير الحسابية والفواتير 📊')),
@@ -945,7 +943,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('إدارة والورديات ⏱️'),
+        title: const Text('إدارة الورديات ⏱️'),
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range, color: Colors.purpleAccent),
@@ -1170,7 +1168,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
   }
 }
 
-// ----------------- 5. شاشة إعدادات الأسعار -----------------
+// ----------------- 5. شاشة إعدادات الأسعار (محسنة) -----------------
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -1181,10 +1179,29 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  final TextEditingController _ps4SingleCtrl = TextEditingController();
-  final TextEditingController _ps4MultiCtrl = TextEditingController();
-  final TextEditingController _ps5SingleCtrl = TextEditingController();
-  final TextEditingController _ps5MultiCtrl = TextEditingController();
+  late TextEditingController _ps4SingleCtrl;
+  late TextEditingController _ps4MultiCtrl;
+  late TextEditingController _ps5SingleCtrl;
+  late TextEditingController _ps5MultiCtrl;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ps4SingleCtrl = TextEditingController();
+    _ps4MultiCtrl = TextEditingController();
+    _ps5SingleCtrl = TextEditingController();
+    _ps5MultiCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _ps4SingleCtrl.dispose();
+    _ps4MultiCtrl.dispose();
+    _ps5SingleCtrl.dispose();
+    _ps5MultiCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1193,12 +1210,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: StreamBuilder<DocumentSnapshot>(
         stream: _db.collection('settings').doc('rates').snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.data() != null) {
+          if (snapshot.hasData && snapshot.data!.data() != null && !_isInitialized) {
             var data = snapshot.data!.data() as Map<String, dynamic>;
             _ps4SingleCtrl.text = (data['ps4SingleRate'] ?? 25.0).toString();
             _ps4MultiCtrl.text = (data['ps4MultiRate'] ?? 40.0).toString();
             _ps5SingleCtrl.text = (data['ps5SingleRate'] ?? 40.0).toString();
             _ps5MultiCtrl.text = (data['ps5MultiRate'] ?? 60.0).toString();
+            _isInitialized = true;
           }
 
           return Padding(
@@ -1217,14 +1235,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 30),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, padding: const EdgeInsets.all(15)),
-                  onPressed: () {
-                    _db.collection('settings').doc('rates').set({
+                  onPressed: () async {
+                    await _db.collection('settings').doc('rates').set({
                       'ps4SingleRate': double.tryParse(_ps4SingleCtrl.text) ?? 25.0,
                       'ps4MultiRate': double.tryParse(_ps4MultiCtrl.text) ?? 40.0,
                       'ps5SingleRate': double.tryParse(_ps5SingleCtrl.text) ?? 40.0,
                       'ps5MultiRate': double.tryParse(_ps5MultiCtrl.text) ?? 60.0,
                     });
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الأسعار بنجاح!')));
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الأسعار بنجاح!')));
+                    }
                   },
                   child: const Text('حفظ الأسعار الجديدة', style: TextStyle(fontSize: 16)),
                 ),
