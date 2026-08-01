@@ -27,11 +27,9 @@ void main() async {
 // دالة مساعدة لحساب بداية اليوم الحسابي (12 ظهراً)
 DateTime getBusinessDayStart(DateTime date) {
   if (date.hour < 12) {
-    // إذا كنا قبل الساعة 12 ظهراً، فنحن نتبع اليوم السابق بدءاً من 12 ظهراً
     DateTime prev = date.subtract(const Duration(days: 1));
     return DateTime(prev.year, prev.month, prev.day, 12, 0, 0);
   } else {
-    // إذا كنا من 12 ظهراً وما بعد، فهذا بداية اليوم الحسابي الحالي
     return DateTime(date.year, date.month, date.day, 12, 0, 0);
   }
 }
@@ -47,7 +45,7 @@ class MangaPsApp extends StatelessWidget {
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
         cardTheme: CardTheme(
-          color: const Color(0xFF1E1E1E),
+          color: const Color(0xFF1E1E1E).withOpacity(0.9),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
@@ -104,16 +102,43 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
           return const MainNavigationScreen();
         }
 
-        return const Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Colors.purpleAccent),
-                SizedBox(height: 20),
-                Text("جاري تحميل Manga PS..."),
-              ],
-            ),
+        return Scaffold(
+          body: Stack(
+            children: [
+              // خلفية التطبيق
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/bg.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, o, s) => Container(color: const Color(0xFF121212)),
+                ),
+              ),
+              Container(color: Colors.black.withOpacity(0.75)),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/logo.jpg',
+                        height: 140,
+                        width: 140,
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, o, s) => const Icon(Icons.sports_esports, size: 80, color: Colors.purpleAccent),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    const CircularProgressIndicator(color: Colors.purpleAccent),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "جاري تحميل Manga PS...",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -141,21 +166,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: Colors.purpleAccent,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'المصروفات'),
-          BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'التقارير'),
-          BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'الوردية'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
-        ],
+    return Container(
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/bg.jpg'),
+          fit: BoxFit.cover,
+          opacity: 0.15, // جعل الخلفية خفيفة حتى لا تؤثر على قراءة البيانات
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: _screens[_currentIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          selectedItemColor: Colors.purpleAccent,
+          unselectedItemColor: Colors.grey,
+          backgroundColor: const Color(0xFF1A1A1A),
+          type: BottomNavigationBarType.fixed,
+          onTap: (index) => setState(() => _currentIndex = index),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
+            BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'المصروفات'),
+            BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'التقارير'),
+            BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'الوردية'),
+            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
+          ],
+        ),
       ),
     );
   }
@@ -401,8 +437,25 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
         }
 
         return Scaffold(
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
-            title: const Text('Manga PS 🎮'),
+            backgroundColor: Colors.black.withOpacity(0.5),
+            title: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/logo.jpg',
+                    height: 35,
+                    width: 35,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, o, s) => const Icon(Icons.sports_esports),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text('Manga PS 🎮', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
             actions: [
               IconButton(icon: const Icon(Icons.add), onPressed: _showAddDeviceDialog),
             ],
@@ -435,6 +488,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                   double cost = calculateCost(device, rates, totalSeconds);
 
                   return Card(
+                    elevation: 4,
                     child: Padding(
                       padding: const EdgeInsets.all(10),
                       child: Column(
@@ -577,7 +631,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.black.withOpacity(0.5),
         title: const Text('سجل المصروفات 💸'),
         actions: [
           IconButton(icon: const Icon(Icons.add), onPressed: _showAddExpenseDialog),
@@ -595,11 +651,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             itemCount: docs.length,
             itemBuilder: (context, i) {
               var exp = docs[i].data() as Map<String, dynamic>;
-              return ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.money_off)),
-                title: Text(exp['title'] ?? ''),
-                subtitle: Text('الفئة: ${exp['category']}'),
-                trailing: Text('${exp['amount']} ج.م', style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                child: ListTile(
+                  leading: const CircleAvatar(child: Icon(Icons.money_off)),
+                  title: Text(exp['title'] ?? ''),
+                  subtitle: Text('الفئة: ${exp['category']}'),
+                  trailing: Text('${exp['amount']} ج.م', style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
               );
             },
           );
@@ -609,7 +668,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ----------------- 3. شاشة التقارير مع نظام اليوم (12 ظهراً) -----------------
+// ----------------- 3. شاشة التقارير -----------------
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -691,10 +750,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
     DateTime now = DateTime.now();
     DateTime startPeriod = isMonthly
         ? DateTime(now.year, now.month, 1, 12, 0, 0)
-        : getBusinessDayStart(now); // 👈 يبدأ من 12 ظهراً للمنظومة الحسابية
+        : getBusinessDayStart(now);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('التقارير الحسابية والفواتير 📊')),
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.black.withOpacity(0.5),
+        title: const Text('التقارير الحسابية والفواتير 📊'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -755,7 +818,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       return ListView(
                         children: [
                           Card(
-                            color: Colors.purple.shade900,
+                            color: Colors.purple.shade900.withOpacity(0.9),
                             child: Padding(
                               padding: const EdgeInsets.all(20),
                               child: Column(
@@ -856,7 +919,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 }
 
-// ----------------- 4. شاشة إدارة الورديات (معدلة ومصلحة بالكامل) -----------------
+// ----------------- 4. شاشة إدارة الورديات -----------------
 class ShiftScreen extends StatefulWidget {
   const ShiftScreen({super.key});
 
@@ -944,7 +1007,9 @@ class _ShiftScreenState extends State<ShiftScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.black.withOpacity(0.5),
         title: const Text('إدارة الورديات ⏱️'),
         actions: [
           IconButton(
@@ -973,7 +1038,6 @@ class _ShiftScreenState extends State<ShiftScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. عرض الوردية المفتوحة حالياً
             StreamBuilder<QuerySnapshot>(
               stream: _db.collection('shifts').where('isOpen', isEqualTo: true).snapshots(),
               builder: (context, snapshot) {
@@ -1028,7 +1092,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
                         double netDrawerCash = startCash + netProfit;
 
                         return Card(
-                          color: Colors.green.shade900,
+                          color: Colors.green.shade900.withOpacity(0.9),
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
@@ -1092,7 +1156,6 @@ class _ShiftScreenState extends State<ShiftScreen> {
             ),
             const SizedBox(height: 10),
 
-            // 2. سجل الورديات المغلقة (بدون orderBy لمنع مشكلة Index في Firebase)
             StreamBuilder<QuerySnapshot>(
               stream: _db.collection('shifts').where('isOpen', isEqualTo: false).snapshots(),
               builder: (context, snapshot) {
@@ -1109,7 +1172,6 @@ class _ShiftScreenState extends State<ShiftScreen> {
 
                 var docs = snapshot.data!.docs.toList();
 
-                // ترتيب الورديات من الأحدث للأقدم داخل الموبايل
                 docs.sort((a, b) {
                   var dataA = a.data() as Map<String, dynamic>;
                   var dataB = b.data() as Map<String, dynamic>;
@@ -1120,7 +1182,6 @@ class _ShiftScreenState extends State<ShiftScreen> {
                   return tsB.compareTo(tsA);
                 });
 
-                // الفلترة بالتاريخ
                 if (_selectedDate != null) {
                   DateTime startFilter = getBusinessDayStart(_selectedDate!);
                   DateTime endFilter = startFilter.add(const Duration(hours: 24));
@@ -1213,7 +1274,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('إعدادات الأسعار ⚙️')),
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.black.withOpacity(0.5),
+        title: const Text('إعدادات الأسعار ⚙️'),
+      ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _db.collection('settings').doc('rates').snapshots(),
         builder: (context, snapshot) {
