@@ -149,7 +149,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ----------------- 1. شاشة الأجهزة (مع إعادة اللوجو) -----------------
+// ----------------- 1. شاشة الأجهزة (مع اللوجو الجديد) -----------------
 class DevicesDashboardScreen extends StatefulWidget {
   const DevicesDashboardScreen({super.key});
 
@@ -399,11 +399,11 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
         return Scaffold(
           appBar: AppBar(
             backgroundColor: const Color(0xFF1E1E1E),
-            // 🖼️ اللوجو الأصلي فوق في AppBar
+            // 🖼️ استخدام اللوجو المطابق لـ assets/logo.jpg
             title: Row(
               children: [
                 Image.asset(
-                  'assets/images/logo.png',
+                  'assets/logo.jpg',
                   height: 35,
                   errorBuilder: (context, error, stackTrace) => const Icon(Icons.sports_esports, color: Color(0xFF6C5CE7)),
                 ),
@@ -709,8 +709,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             const SizedBox(height: 15),
             Expanded(
               child: isMonthly
-                  ? _buildMonthlySummaryReport(startPeriod) // التقرير الشهري المختصر بالورديات
-                  : _buildDailyDetailedReport(startPeriod), // تقرير اليوم التفصيلي
+                  ? _buildMonthlySummaryReport(startPeriod)
+                  : _buildDailyDetailedReport(startPeriod),
             ),
           ],
         ),
@@ -718,7 +718,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  // 📊 تقرير الشهر المختصر (ملخص أسعار الورديات والمصاريف)
   Widget _buildMonthlySummaryReport(DateTime startPeriod) {
     return StreamBuilder<QuerySnapshot>(
       stream: _db.collection('shifts').where('isOpen', isEqualTo: false).snapshots(),
@@ -824,7 +823,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  // 📄 تقرير اليوم
   Widget _buildDailyDetailedReport(DateTime startPeriod) {
     return StreamBuilder<QuerySnapshot>(
       stream: _db.collection('invoices').snapshots(),
