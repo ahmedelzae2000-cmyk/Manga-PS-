@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package0/cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,10 +42,29 @@ class MangaPsApp extends StatelessWidget {
       title: 'Manga PS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        scaffoldBackgroundColor: Colors.transparent, // شفاف عشان الخلفية تظهر
         primaryColor: const Color(0xFF6C5CE7),
       ),
       home: const FirebaseLoaderScreen(),
+    );
+  }
+}
+
+// 🖼️ ويدجت تغليف الشاشات بالخلفية
+class BackgroundWrapper extends StatelessWidget {
+  final Widget child;
+  const BackgroundWrapper({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage("assets/bg.jpg"),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: child,
     );
   }
 }
@@ -80,14 +99,17 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
       future: _initialization,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: SelectableText(
-                  "فشل الاتصال بـ Firebase:\n${snapshot.error}",
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.orangeAccent, fontSize: 16),
+          return BackgroundWrapper(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: SelectableText(
+                    "فشل الاتصال بـ Firebase:\n${snapshot.error}",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.orangeAccent, fontSize: 16),
+                  ),
                 ),
               ),
             ),
@@ -98,9 +120,12 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
           return const MainNavigationScreen();
         }
 
-        return const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(color: Color(0xFF6C5CE7)),
+        return const BackgroundWrapper(
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF6C5CE7)),
+            ),
           ),
         );
       },
@@ -128,28 +153,31 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        backgroundColor: const Color(0xFF1E1E1E),
-        selectedItemColor: const Color(0xFF6C5CE7),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'المصروفات'),
-          BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'التقارير'),
-          BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'الوردية'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
-        ],
+    return BackgroundWrapper(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: _screens[_currentIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          backgroundColor: const Color(0xFF1E1E1E).withOpacity(0.9),
+          selectedItemColor: const Color(0xFF6C5CE7),
+          unselectedItemColor: Colors.grey,
+          type: BottomNavigationBarType.fixed,
+          onTap: (index) => setState(() => _currentIndex = index),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
+            BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'المصروفات'),
+            BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'التقارير'),
+            BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'الوردية'),
+            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ----------------- 1. شاشة الأجهزة (مع اللوجو الجديد) -----------------
+// ----------------- 1. شاشة الأجهزة -----------------
 class DevicesDashboardScreen extends StatefulWidget {
   const DevicesDashboardScreen({super.key});
 
@@ -397,15 +425,20 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
         }
 
         return Scaffold(
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
-            backgroundColor: const Color(0xFF1E1E1E),
-            // 🖼️ استخدام اللوجو المطابق لـ assets/logo.jpg
+            backgroundColor: const Color(0xFF1E1E1E).withOpacity(0.8),
             title: Row(
               children: [
-                Image.asset(
-                  'assets/logo.jpg',
-                  height: 35,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.sports_esports, color: Color(0xFF6C5CE7)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.asset(
+                    'assets/logo.jpg',
+                    height: 35,
+                    width: 35,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.sports_esports, color: Color(0xFF6C5CE7)),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 const Text('Manga PS', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -422,7 +455,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
               if (!devicesSnap.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF6C5CE7)));
 
               final docs = devicesSnap.data!.docs;
-              if (docs.isEmpty) return const Center(child: Text("اضغط + من الأعلى لإضافة جهاز جديد"));
+              if (docs.isEmpty) return const Center(child: Text("اضغط + من الأعلى لإضافة جهاز جديد", style: TextStyle(color: Colors.white)));
 
               return GridView.builder(
                 padding: const EdgeInsets.all(12),
@@ -443,7 +476,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                   double cost = calculateCost(device, rates, totalSeconds);
 
                   return Card(
-                    color: const Color(0xFF1E1E1E),
+                    color: const Color(0xFF1E1E1E).withOpacity(0.85),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                       side: BorderSide(
@@ -619,8 +652,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: const Color(0xFF1E1E1E).withOpacity(0.8),
         title: const Text('المصروفات 💸'),
         actions: [
           IconButton(icon: const Icon(Icons.add_circle_outline, color: Color(0xFF6C5CE7), size: 28), onPressed: _showAddExpenseDialog),
@@ -640,7 +674,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             itemBuilder: (context, i) {
               var exp = docs[i].data() as Map<String, dynamic>;
               return Card(
-                color: const Color(0xFF1E1E1E),
+                color: const Color(0xFF1E1E1E).withOpacity(0.85),
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
                   title: Text(exp['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -656,7 +690,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ----------------- 3. شاشة التقارير الحسابية (مختصرة للورديات بالشهر) -----------------
+// ----------------- 3. شاشة التقارير -----------------
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -682,8 +716,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         : getBusinessDayStart(now);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: const Color(0xFF1E1E1E).withOpacity(0.8),
         title: const Text('التقارير الحسابية 📊'),
       ),
       body: Padding(
@@ -755,7 +790,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
+                color: const Color(0xFF1E1E1E).withOpacity(0.85),
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(color: const Color(0xFF6C5CE7)),
               ),
@@ -792,7 +827,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   double net = (shift['netProfit'] ?? 0).toDouble();
 
                   return Card(
-                    color: const Color(0xFF1E1E1E),
+                    color: const Color(0xFF1E1E1E).withOpacity(0.85),
                     margin: const EdgeInsets.only(bottom: 8),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
@@ -865,7 +900,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
+                    color: const Color(0xFF1E1E1E).withOpacity(0.85),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Column(
@@ -881,7 +916,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   children: [
                     Expanded(
                       child: Card(
-                        color: const Color(0xFF1E1E1E),
+                        color: const Color(0xFF1E1E1E).withOpacity(0.85),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
@@ -895,7 +930,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                     Expanded(
                       child: Card(
-                        color: const Color(0xFF1E1E1E),
+                        color: const Color(0xFF1E1E1E).withOpacity(0.85),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
@@ -1002,8 +1037,9 @@ class _ShiftScreenState extends State<ShiftScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: const Color(0xFF1E1E1E).withOpacity(0.8),
         title: const Text('إدارة الورديات ⏱️'),
       ),
       body: Padding(
@@ -1061,7 +1097,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E1E),
+                        color: const Color(0xFF1E1E1E).withOpacity(0.85),
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Column(
@@ -1113,8 +1149,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: const Color(0xFF1E1E1E).withOpacity(0.8),
         title: const Text('إعدادات الأسعار ⚙️'),
       ),
       body: StreamBuilder<DocumentSnapshot>(
