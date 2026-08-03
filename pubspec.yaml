@@ -1,4 +1,4 @@
-name: manga_ps
+Name: manga_ps
 description: "تطبيق Manga PS لإدارة الأجهزة والحسابات"
 publish_to: 'none'
 version: 1.0.0+1
@@ -16,12 +16,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  flutter_launcher_icons: ^0.13.1 # 👈 أضفنا مكتبة أيقونة الشاشة الخارجية
+  flutter_launcher_icons: ^0.13.1
 
-# 👈 إعدادات توليد الأيقونة الخارجية من اللوجو
+# 👈 إعدادات توليد الأيقونة للأندرويد فقط
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false # 👈 خلّي دي false عشان متضربش في الـ Build
   image_path: "assets/logo.jpg"
 
 flutter:
