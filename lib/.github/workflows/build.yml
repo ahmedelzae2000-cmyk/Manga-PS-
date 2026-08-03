@@ -26,6 +26,10 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # 🪄 الخطوة السحرية: إعادة إنشاء مجلدات أندرويد الأساسية لو كانت ناقصة
+      - name: Recreate Android Project Files
+        run: flutter create . --platforms=android
+
       - name: Generate Launcher Icons
         run: flutter pub run flutter_launcher_icons
 
