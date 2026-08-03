@@ -26,6 +26,14 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # 🪄 إجبار فلاتر على إعادة إنشاء ملفات أندرويد الحديثة بالكامل (v2 embedding + AndroidManifest)
+      - name: Recreate Complete Android Project
+        run: flutter create . --platforms=android --org com.manga
+
+      # 🎨 تطبيق الأيقونة
+      - name: Generate Launcher Icons
+        run: flutter pub run flutter_launcher_icons
+
       - name: Build APK
         run: flutter build apk --release
 
