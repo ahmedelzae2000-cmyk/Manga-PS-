@@ -1,5 +1,5 @@
-Name: manga_ps
-description: "تطبيق Manga PS لإدارة الأجهزة والحسابات"
+name: manga_ps
+description: "Manga PS App"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -18,10 +18,9 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
-# 👈 إعدادات توليد الأيقونة للأندرويد فقط
 flutter_launcher_icons:
   android: true
-  ios: false # 👈 خلّي دي false عشان متضربش في الـ Build
+  ios: false
   image_path: "assets/logo.jpg"
 
 flutter:
