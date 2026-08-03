@@ -24,7 +24,6 @@ void main() async {
   runApp(const MangaPsApp());
 }
 
-// دالة حساب بداية اليوم الحسابي (12 ظهراً)
 DateTime getBusinessDayStart(DateTime date) {
   if (date.hour < 12) {
     DateTime prev = date.subtract(const Duration(days: 1));
@@ -42,20 +41,9 @@ class MangaPsApp extends StatelessWidget {
     return MaterialApp(
       title: 'Manga PS',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0E17), // أسود نيون غامق
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00E5FF), // Cyan Neon
-          secondary: Color(0xFFFF007F), // Pink Neon
-          surface: Color(0xFF131927),
-        ),
-        cardTheme: CardTheme(
-          color: const Color(0xFF131927),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: Color(0xFF1F293D), width: 1.5),
-          ),
-        ),
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        primaryColor: const Color(0xFF6C5CE7),
       ),
       home: const FirebaseLoaderScreen(),
     );
@@ -110,28 +98,9 @@ class _FirebaseLoaderScreenState extends State<FirebaseLoaderScreen> {
           return const MainNavigationScreen();
         }
 
-        return Scaffold(
+        return const Scaffold(
           body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.5), blurRadius: 30, spreadRadius: 5),
-                    ],
-                  ),
-                  child: const CircularProgressIndicator(color: Color(0xFF00E5FF), strokeWidth: 3),
-                ),
-                const SizedBox(height: 25),
-                const Text(
-                  "MANGA PS",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF), letterSpacing: 3),
-                ),
-              ],
-            ),
+            child: CircularProgressIndicator(color: Color(0xFF6C5CE7)),
           ),
         );
       },
@@ -161,33 +130,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.15), blurRadius: 20, spreadRadius: 1),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          backgroundColor: const Color(0xFF0D121D),
-          selectedItemColor: const Color(0xFF00E5FF),
-          unselectedItemColor: Colors.grey.shade600,
-          type: BottomNavigationBarType.fixed,
-          onTap: (index) => setState(() => _currentIndex = index),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
-            BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'المصروفات'),
-            BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'التقارير'),
-            BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'الوردية'),
-            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
-          ],
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        backgroundColor: const Color(0xFF1E1E1E),
+        selectedItemColor: const Color(0xFF6C5CE7),
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'المصروفات'),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'التقارير'),
+          BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'الوردية'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
+        ],
       ),
     );
   }
 }
 
-// ----------------- 1. شاشة الأجهزة (Cyberpunk Neon) -----------------
+// ----------------- 1. شاشة الأجهزة (مع إعادة اللوجو) -----------------
 class DevicesDashboardScreen extends StatefulWidget {
   const DevicesDashboardScreen({super.key});
 
@@ -234,7 +196,6 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
     return "${twoDigits(dur.inHours)}:${twoDigits(dur.inMinutes.remainder(60))}:${twoDigits(dur.inSeconds.remainder(60))}";
   }
 
-  // ⚡ حساب التكلفة بناءً على سعر الربع ساعة (Quarter Hours Calculation)
   double calculateCost(Map<String, dynamic> device, Map<String, dynamic> rates, int totalSeconds) {
     if (totalSeconds <= 0) return 0.0;
 
@@ -248,12 +209,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
       hourlyRate = isMulti ? (rates['ps5MultiRate'] ?? 60.0) : (rates['ps5SingleRate'] ?? 40.0);
     }
 
-    double quarterRate = hourlyRate / 4.0;
-    
-    // التقريب لأقرب ربع ساعة (15 دقيقة = 900 ثانية)
-    int quarters = (totalSeconds / 900).ceil();
-
-    return quarters * quarterRate;
+    return (totalSeconds / 3600.0) * hourlyRate;
   }
 
   void _toggleDeviceState(String docId, Map<String, dynamic> device) async {
@@ -281,13 +237,13 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF131927),
-        title: const Text('إضافة جهاز جديد 🎮', style: TextStyle(color: Color(0xFF00E5FF))),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('إضافة جهاز جديد 🎮'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              decoration: const InputDecoration(labelText: 'اسم الجهاز (مثال: جهاز 1)'),
+              decoration: const InputDecoration(labelText: 'اسم الجهاز'),
               onChanged: (val) => name = val,
             ),
             const SizedBox(height: 10),
@@ -305,7 +261,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C5CE7)),
             onPressed: () {
               if (name.isNotEmpty) {
                 _db.collection('devices').add({
@@ -330,9 +286,9 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF131927),
+        backgroundColor: const Color(0xFF1E1E1E),
         title: Text('حذف $name؟', style: const TextStyle(color: Colors.redAccent)),
-        content: const Text('هل أنت تأكد من إزالة هذا الجهاز نهائياً؟'),
+        content: const Text('هل أنت تأكد من إزالة هذا الجهاز؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
           ElevatedButton(
@@ -341,7 +297,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
               await _db.collection('devices').doc(docId).delete();
               if (mounted) Navigator.pop(context);
             },
-            child: const Text('حذف الجهاز'),
+            child: const Text('حذف'),
           ),
         ],
       ),
@@ -357,31 +313,30 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF131927),
-            title: Text('إنهاء جلسة: ${device['name']}', style: const TextStyle(color: Color(0xFFFF007F))),
+            backgroundColor: const Color(0xFF1E1E1E),
+            title: Text('إنهاء جلسة: ${device['name']}'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('الوقت المنقضي: ${formatTime(totalSeconds)}', style: const TextStyle(fontSize: 14)),
+                Text('الوقت المنقضي: ${formatTime(totalSeconds)}'),
                 const SizedBox(height: 5),
-                Text('حساب الربع ساعة: ${calculatedCost.toStringAsFixed(2)} ج.م', style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 13, fontWeight: FontWeight.bold)),
+                Text('السعر المحسوب: ${calculatedCost.toStringAsFixed(2)} ج.م', style: const TextStyle(color: Colors.grey)),
                 const SizedBox(height: 15),
                 TextField(
                   controller: priceController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'المبلغ النهائي (تعديل السعر ج.م)',
+                    labelText: 'المبلغ النهائي (ج.م)',
                     border: OutlineInputBorder(),
-                    suffixText: 'ج.م',
                   ),
                 ),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<String>(
                   value: paymentMethod,
                   items: const [
-                    DropdownMenuItem(value: 'كاش', child: Text('نقداً (كاش)')),
-                    DropdownMenuItem(value: 'فيزا/محفظة', child: Text('دفع إلكتروني (فيزا/فودافون كاش)')),
+                    DropdownMenuItem(value: 'كاش', child: Text('كاش')),
+                    DropdownMenuItem(value: 'فيزا/محفظة', child: Text('فيزا/فودافون كاش')),
                   ],
                   onChanged: (val) => setDialogState(() => paymentMethod = val!),
                   decoration: const InputDecoration(labelText: 'طريقة الدفع'),
@@ -391,7 +346,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF007F), foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C5CE7)),
                 onPressed: () async {
                   double finalAmount = double.tryParse(priceController.text) ?? calculatedCost;
 
@@ -417,7 +372,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
 
                   if (mounted) Navigator.pop(context);
                 },
-                child: const Text('حفظ وتسجيل الفاتورة'),
+                child: const Text('إنهاء وتسجيل الفاتورة'),
               ),
             ],
           );
@@ -443,17 +398,28 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0D121D),
-            title: const Text('MANGA PS 🎮', style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold, letterSpacing: 2)),
+            backgroundColor: const Color(0xFF1E1E1E),
+            // 🖼️ اللوجو الأصلي فوق في AppBar
+            title: Row(
+              children: [
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 35,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.sports_esports, color: Color(0xFF6C5CE7)),
+                ),
+                const SizedBox(width: 10),
+                const Text('Manga PS', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
             actions: [
-              IconButton(icon: const Icon(Icons.add_circle_outline, color: Color(0xFF00E5FF), size: 28), onPressed: _showAddDeviceDialog),
+              IconButton(icon: const Icon(Icons.add_circle_outline, color: Color(0xFF6C5CE7), size: 28), onPressed: _showAddDeviceDialog),
             ],
           ),
           body: StreamBuilder<QuerySnapshot>(
             stream: _db.collection('devices').snapshots(),
             builder: (context, devicesSnap) {
               if (devicesSnap.hasError) return Center(child: Text("خطأ: ${devicesSnap.error}"));
-              if (!devicesSnap.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
+              if (!devicesSnap.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF6C5CE7)));
 
               final docs = devicesSnap.data!.docs;
               if (docs.isEmpty) return const Center(child: Text("اضغط + من الأعلى لإضافة جهاز جديد"));
@@ -462,7 +428,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                 padding: const EdgeInsets.all(12),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 0.65,
+                  childAspectRatio: 0.68,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
@@ -476,22 +442,14 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                   int totalSeconds = _calculateElapsedSeconds(device);
                   double cost = calculateCost(device, rates, totalSeconds);
 
-                  Color activeNeonColor = isActive ? const Color(0xFF00E5FF) : const Color(0xFF1F293D);
-
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF131927),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isActive ? const Color(0xFF00E5FF) : Colors.white10,
-                        width: isActive ? 2 : 1,
+                  return Card(
+                    color: const Color(0xFF1E1E1E),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      side: BorderSide(
+                        color: isActive ? const Color(0xFF6C5CE7) : Colors.transparent,
+                        width: 2,
                       ),
-                      boxShadow: isActive
-                          ? [
-                              BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.3), blurRadius: 15, spreadRadius: 1),
-                            ]
-                          : [],
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -501,45 +459,30 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(device['name'] ?? 'جهاز', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                              Text(device['name'] ?? 'جهاز', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                               IconButton(
                                 icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
                                 onPressed: () => _deleteDevice(docId, device['name'] ?? 'الجهاز'),
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: device['type'] == 'PS5' ? const Color(0xFFFF007F).withOpacity(0.2) : const Color(0xFF00E5FF).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              device['type'] ?? 'PS4',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: device['type'] == 'PS5' ? const Color(0xFFFF007F) : const Color(0xFF00E5FF),
-                              ),
-                            ),
+                          Text(
+                            device['type'] ?? 'PS4',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                           Column(
                             children: [
                               Text(
                                 formatTime(totalSeconds),
                                 style: TextStyle(
-                                  fontSize: 22,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: isActive ? const Color(0xFF00E5FF) : Colors.grey,
-                                  shadows: isActive
-                                      ? [const Shadow(color: Color(0xFF00E5FF), blurRadius: 10)]
-                                      : [],
+                                  color: isActive ? const Color(0xFF6C5CE7) : Colors.white,
                                 ),
                               ),
-                              const SizedBox(height: 4),
                               Text(
                                 '${cost.toStringAsFixed(2)} ج.م',
-                                style: const TextStyle(fontSize: 16, color: Color(0xFFFFD700), fontWeight: FontWeight.bold),
+                                style: const TextStyle(fontSize: 15, color: Colors.greenAccent, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
@@ -549,14 +492,12 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                               ChoiceChip(
                                 label: const Text('فردي', style: TextStyle(fontSize: 11)),
                                 selected: !isMulti,
-                                selectedColor: const Color(0xFF00E5FF).withOpacity(0.3),
                                 onSelected: (val) => _db.collection('devices').doc(docId).update({'isMulti': false}),
                               ),
                               const SizedBox(width: 4),
                               ChoiceChip(
                                 label: const Text('زوجي', style: TextStyle(fontSize: 11)),
                                 selected: isMulti,
-                                selectedColor: const Color(0xFFFF007F).withOpacity(0.3),
                                 onSelected: (val) => _db.collection('devices').doc(docId).update({'isMulti': true}),
                               ),
                             ],
@@ -566,9 +507,7 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isActive ? Colors.orangeAccent : const Color(0xFF00E5FF),
-                                    foregroundColor: Colors.black,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    backgroundColor: isActive ? Colors.orangeAccent : const Color(0xFF6C5CE7),
                                   ),
                                   onPressed: () => _toggleDeviceState(docId, device),
                                   child: Text(isActive ? 'إيقاف' : 'تشغيل', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
@@ -581,11 +520,11 @@ class _DevicesDashboardScreenState extends State<DevicesDashboardScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFF007F).withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: const Color(0xFFFF007F)),
+                                      color: Colors.green.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.greenAccent),
                                     ),
-                                    child: const Icon(Icons.receipt_long, color: Color(0xFFFF007F), size: 20),
+                                    child: const Icon(Icons.receipt_long, color: Colors.greenAccent, size: 20),
                                   ),
                                 )
                               ]
@@ -624,8 +563,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF131927),
-        title: const Text('تسجيل مصروف جديد 💸', style: TextStyle(color: Color(0xFFFF007F))),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('تسجيل مصروف جديد 💸'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -654,7 +593,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF007F)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C5CE7)),
             onPressed: () async {
               if (title.isNotEmpty && amount > 0) {
                 var activeShift = await _db.collection('shifts').where('isOpen', isEqualTo: true).get();
@@ -670,7 +609,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 if (mounted) Navigator.pop(context);
               }
             },
-            child: const Text('حفظ المصروف'),
+            child: const Text('حفظ'),
           ),
         ],
       ),
@@ -681,29 +620,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D121D),
-        title: const Text('سجل المصروفات 💸', style: TextStyle(color: Color(0xFFFF007F))),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('المصروفات 💸'),
         actions: [
-          IconButton(icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFF007F), size: 28), onPressed: _showAddExpenseDialog),
+          IconButton(icon: const Icon(Icons.add_circle_outline, color: Color(0xFF6C5CE7), size: 28), onPressed: _showAddExpenseDialog),
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _db.collection('expenses').snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFFF007F)));
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF6C5CE7)));
 
           var docs = snapshot.data!.docs.toList();
-
-          docs.sort((a, b) {
-            var dataA = a.data() as Map<String, dynamic>;
-            var dataB = b.data() as Map<String, dynamic>;
-            Timestamp? tsA = dataA['timestamp'] as Timestamp?;
-            Timestamp? tsB = dataB['timestamp'] as Timestamp?;
-            if (tsA == null) return 1;
-            if (tsB == null) return -1;
-            return tsB.compareTo(tsA);
-          });
-
           if (docs.isEmpty) return const Center(child: Text("لا توجد مصروفات مسجلة"));
 
           return ListView.builder(
@@ -712,11 +640,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             itemBuilder: (context, i) {
               var exp = docs[i].data() as Map<String, dynamic>;
               return Card(
+                color: const Color(0xFF1E1E1E),
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
-                  leading: const CircleAvatar(backgroundColor: Color(0xFF1F293D), child: Icon(Icons.money_off, color: Color(0xFFFF007F))),
                   title: Text(exp['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('الفئة: ${exp['category']}', style: const TextStyle(color: Colors.grey)),
+                  subtitle: Text('الفئة: ${exp['category']}'),
                   trailing: Text('${exp['amount']} ج.م', style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               );
@@ -728,7 +656,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ----------------- 3. شاشة التقارير الحسابية -----------------
+// ----------------- 3. شاشة التقارير الحسابية (مختصرة للورديات بالشهر) -----------------
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -740,71 +668,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   bool isMonthly = false;
 
-  void _editInvoice(String docId, Map<String, dynamic> invoice) {
-    TextEditingController amountCtrl = TextEditingController(text: (invoice['finalAmount'] ?? 0).toString());
-    String method = invoice['paymentMethod'] ?? 'كاش';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF131927),
-            title: Text('تعديل فاتورة: ${invoice['deviceName'] ?? ''}', style: const TextStyle(color: Color(0xFF00E5FF))),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'المبلغ المعدل (ج.م)'),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: method,
-                  items: const [
-                    DropdownMenuItem(value: 'كاش', child: Text('نقداً (كاش)')),
-                    DropdownMenuItem(value: 'فيزا/محفظة', child: Text('دفع إلكتروني (فيزا/فودافون كاش)')),
-                  ],
-                  onChanged: (val) => setDialogState(() => method = val!),
-                  decoration: const InputDecoration(labelText: 'طريقة الدفع'),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
-                onPressed: () async {
-                  await _db.collection('invoices').doc(docId).delete();
-                  if (mounted) Navigator.pop(context);
-                },
-                child: const Text('حذف الفاتورة'),
-              ),
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
-                onPressed: () async {
-                  double? newAmount = double.tryParse(amountCtrl.text);
-                  if (newAmount != null) {
-                    await _db.collection('invoices').doc(docId).update({
-                      'finalAmount': newAmount,
-                      'paymentMethod': method,
-                    });
-                    if (mounted) Navigator.pop(context);
-                  }
-                },
-                child: const Text('تحديث'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  String _formatDuration(int seconds) {
-    int mins = (seconds / 60).round();
-    return '$mins دقيقة';
+  String _formatTimestamp(Timestamp? ts) {
+    if (ts == null) return 'غير محدد';
+    DateTime dt = ts.toDate();
+    return "${dt.year}/${dt.month}/${dt.day} (${dt.hour}:${dt.minute.toString().padLeft(2, '0')})";
   }
 
   @override
@@ -816,8 +683,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D121D),
-        title: const Text('التقارير الحسابية 📊', style: TextStyle(color: Color(0xFF00E5FF))),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('التقارير الحسابية 📊'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -827,188 +694,233 @@ class _ReportsScreenState extends State<ReportsScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ChoiceChip(
-                  label: const Text('تقرير اليوم (12ظ - 12ظ)'),
+                  label: const Text('تقرير اليوم'),
                   selected: !isMonthly,
-                  selectedColor: const Color(0xFF00E5FF).withOpacity(0.3),
                   onSelected: (val) => setState(() => isMonthly = false),
                 ),
                 const SizedBox(width: 15),
                 ChoiceChip(
-                  label: const Text('تقرير الشهر'),
+                  label: const Text('تقرير الشهر (ملخص الورديات)'),
                   selected: isMonthly,
-                  selectedColor: const Color(0xFFFF007F).withOpacity(0.3),
                   onSelected: (val) => setState(() => isMonthly = true),
                 ),
               ],
             ),
             const SizedBox(height: 15),
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _db.collection('invoices').snapshots(),
-                builder: (context, invoicesSnap) {
-                  return StreamBuilder<QuerySnapshot>(
-                    stream: _db.collection('expenses').snapshots(),
-                    builder: (context, expensesSnap) {
-                      if (!invoicesSnap.hasData || !expensesSnap.hasData) {
-                        return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
-                      }
-
-                      final invoices = invoicesSnap.data!.docs.where((doc) {
-                        var data = doc.data() as Map<String, dynamic>;
-                        Timestamp? ts = data['timestamp'] as Timestamp?;
-                        if (ts == null) return false;
-                        return ts.toDate().isAfter(startPeriod);
-                      }).toList();
-
-                      invoices.sort((a, b) {
-                        var tsA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                        var tsB = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                        if (tsA == null) return 1;
-                        if (tsB == null) return -1;
-                        return tsB.compareTo(tsA);
-                      });
-
-                      double totalIncome = 0;
-                      double cashIncome = 0;
-                      double visaIncome = 0;
-
-                      for (var doc in invoices) {
-                        var data = doc.data() as Map<String, dynamic>;
-                        double amount = (data['finalAmount'] ?? 0).toDouble();
-                        totalIncome += amount;
-                        if (data['paymentMethod'] == 'فيزا/محفظة') {
-                          visaIncome += amount;
-                        } else {
-                          cashIncome += amount;
-                        }
-                      }
-
-                      final expenses = expensesSnap.data!.docs.where((doc) {
-                        var data = doc.data() as Map<String, dynamic>;
-                        Timestamp? ts = data['timestamp'] as Timestamp?;
-                        if (ts == null) return false;
-                        return ts.toDate().isAfter(startPeriod);
-                      }).toList();
-
-                      double totalExpenses = 0;
-                      for (var doc in expenses) {
-                        var data = doc.data() as Map<String, dynamic>;
-                        totalExpenses += (data['amount'] ?? 0).toDouble();
-                      }
-
-                      double netProfit = totalIncome - totalExpenses;
-
-                      return ListView(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: [Color(0xFF1F293D), Color(0xFF131927)]),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.5)),
-                              boxShadow: [BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.15), blurRadius: 15)],
-                            ),
-                            child: Column(
-                              children: [
-                                Text(isMonthly ? 'صافي أرباح الشهر' : 'صافي أرباح اليوم (من 12 ظهراً)', style: const TextStyle(fontSize: 15, color: Colors.grey)),
-                                const SizedBox(height: 10),
-                                Text(
-                                  '${netProfit.toStringAsFixed(2)} ج.م',
-                                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      children: [
-                                        const Text('إجمالي الدخل', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                        Text('${totalIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16, color: Colors.greenAccent, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      children: [
-                                        const Text('إجمالي المصروفات', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                        Text('${totalExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 16, color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 30, color: Colors.white10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('سجل الفواتير (${invoices.length}) 🧾', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFF007F))),
-                              Text('كاش: $cashIncome | فيزا: $visaIncome', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          if (invoices.isEmpty)
-                            const Center(child: Padding(padding: EdgeInsets.all(20), child: Text("لا توجد فواتير مسجلة للفترة")))
-                          else
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: invoices.length,
-                              itemBuilder: (context, index) {
-                                var invDoc = invoices[index];
-                                var inv = invDoc.data() as Map<String, dynamic>;
-                                String invId = invDoc.id;
-
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: const Color(0xFF1F293D),
-                                      child: Icon(inv['paymentMethod'] == 'فيزا/محفظة' ? Icons.credit_card : Icons.money, size: 20, color: const Color(0xFF00E5FF)),
-                                    ),
-                                    title: Text(inv['deviceName'] ?? 'جهاز', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Text('المدة: ${_formatDuration(inv['durationSeconds'] ?? 0)} • ${inv['paymentMethod']}'),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text('${inv['finalAmount']} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFFFFD700))),
-                                        IconButton(
-                                          icon: const Icon(Icons.edit, size: 18, color: Color(0xFF00E5FF)),
-                                          onPressed: () => _editInvoice(invId, inv),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                        ],
-                      );
-                    },
-                  );
-                },
-              ),
+              child: isMonthly
+                  ? _buildMonthlySummaryReport(startPeriod) // التقرير الشهري المختصر بالورديات
+                  : _buildDailyDetailedReport(startPeriod), // تقرير اليوم التفصيلي
             ),
           ],
         ),
       ),
     );
   }
+
+  // 📊 تقرير الشهر المختصر (ملخص أسعار الورديات والمصاريف)
+  Widget _buildMonthlySummaryReport(DateTime startPeriod) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _db.collection('shifts').where('isOpen', isEqualTo: false).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF6C5CE7)));
+
+        var shiftDocs = snapshot.data!.docs.where((doc) {
+          var data = doc.data() as Map<String, dynamic>;
+          Timestamp? ts = data['startTime'] as Timestamp?;
+          if (ts == null) return false;
+          return ts.toDate().isAfter(startPeriod);
+        }).toList();
+
+        shiftDocs.sort((a, b) {
+          var tsA = (a.data() as Map<String, dynamic>)['startTime'] as Timestamp?;
+          var tsB = (b.data() as Map<String, dynamic>)['startTime'] as Timestamp?;
+          if (tsA == null) return 1;
+          if (tsB == null) return -1;
+          return tsB.compareTo(tsA);
+        });
+
+        double totalMonthIncome = 0;
+        double totalMonthExpenses = 0;
+
+        for (var doc in shiftDocs) {
+          var data = doc.data() as Map<String, dynamic>;
+          totalMonthIncome += (data['totalIncome'] ?? 0).toDouble();
+          totalMonthExpenses += (data['totalExpenses'] ?? 0).toDouble();
+        }
+
+        double totalMonthNet = totalMonthIncome - totalMonthExpenses;
+
+        return ListView(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFF6C5CE7)),
+              ),
+              child: Column(
+                children: [
+                  const Text('إجمالي أرباح الشهر', style: TextStyle(fontSize: 15, color: Colors.grey)),
+                  const SizedBox(height: 5),
+                  Text('${totalMonthNet.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Text('الدخل: ${totalMonthIncome.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                      Text('المصاريف: ${totalMonthExpenses.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
+                    ],
+                  )
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text('ملخص ورديات الشهر (${shiftDocs.length}) 📜', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF6C5CE7))),
+            const SizedBox(height: 10),
+            if (shiftDocs.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(20), child: Text("لا توجد ورديات مغلقة هذا الشهر")))
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: shiftDocs.length,
+                itemBuilder: (context, i) {
+                  var shift = shiftDocs[i].data() as Map<String, dynamic>;
+                  double inc = (shift['totalIncome'] ?? 0).toDouble();
+                  double exp = (shift['totalExpenses'] ?? 0).toDouble();
+                  double net = (shift['netProfit'] ?? 0).toDouble();
+
+                  return Card(
+                    color: const Color(0xFF1E1E1E),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_formatTimestamp(shift['startTime'] as Timestamp?), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              const SizedBox(height: 4),
+                              Text('دخل: ${inc.toStringAsFixed(1)} | مصاريف: ${exp.toStringAsFixed(1)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            ],
+                          ),
+                          Text(
+                            'الصافي: ${net.toStringAsFixed(1)} ج.م',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 📄 تقرير اليوم
+  Widget _buildDailyDetailedReport(DateTime startPeriod) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _db.collection('invoices').snapshots(),
+      builder: (context, invoicesSnap) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: _db.collection('expenses').snapshots(),
+          builder: (context, expensesSnap) {
+            if (!invoicesSnap.hasData || !expensesSnap.hasData) {
+              return const Center(child: CircularProgressIndicator(color: Color(0xFF6C5CE7)));
+            }
+
+            final invoices = invoicesSnap.data!.docs.where((doc) {
+              var data = doc.data() as Map<String, dynamic>;
+              Timestamp? ts = data['timestamp'] as Timestamp?;
+              if (ts == null) return false;
+              return ts.toDate().isAfter(startPeriod);
+            }).toList();
+
+            double totalIncome = 0;
+            for (var doc in invoices) {
+              totalIncome += ((doc.data() as Map<String, dynamic>)['finalAmount'] ?? 0).toDouble();
+            }
+
+            final expenses = expensesSnap.data!.docs.where((doc) {
+              var data = doc.data() as Map<String, dynamic>;
+              Timestamp? ts = data['timestamp'] as Timestamp?;
+              if (ts == null) return false;
+              return ts.toDate().isAfter(startPeriod);
+            }).toList();
+
+            double totalExpenses = 0;
+            for (var doc in expenses) {
+              totalExpenses += ((doc.data() as Map<String, dynamic>)['amount'] ?? 0).toDouble();
+            }
+
+            double netProfit = totalIncome - totalExpenses;
+
+            return ListView(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('صافي أرباح اليوم', style: TextStyle(fontSize: 15, color: Colors.grey)),
+                      const SizedBox(height: 5),
+                      Text('${netProfit.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF6C5CE7))),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Card(
+                        color: const Color(0xFF1E1E1E),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            children: [
+                              const Text('إجمالي الدخل', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('${totalIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 15, color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Card(
+                        color: const Color(0xFF1E1E1E),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            children: [
+                              const Text('إجمالي المصروفات', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('${totalExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 15, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
-// ----------------- 4. شاشة إدارة الورديات -----------------
+// ----------------- 4. شاشة الورديات -----------------
 class ShiftScreen extends StatefulWidget {
   const ShiftScreen({super.key});
 
@@ -1018,7 +930,6 @@ class ShiftScreen extends StatefulWidget {
 
 class _ShiftScreenState extends State<ShiftScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  DateTime? _selectedDate;
 
   void _startShift() {
     TextEditingController cashCtrl = TextEditingController(text: '0');
@@ -1026,17 +937,17 @@ class _ShiftScreenState extends State<ShiftScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF131927),
-        title: const Text('فتح وردية جديدة ⏱️', style: TextStyle(color: Color(0xFF00E5FF))),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('فتح وردية جديدة ⏱️'),
         content: TextField(
           controller: cashCtrl,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'مبلغ درج الكاش للبداية (الدرج)'),
+          decoration: const InputDecoration(labelText: 'مبلغ درج الكاش للبداية'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C5CE7)),
             onPressed: () async {
               await _db.collection('shifts').add({
                 'isOpen': true,
@@ -1056,7 +967,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF131927),
+        backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('تأكيد إغلاق الوردية', style: TextStyle(color: Colors.redAccent)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1065,7 +976,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
             Text('إجمالي الدخل: ${totalIncome.toStringAsFixed(2)} ج.م'),
             Text('إجمالي المصروفات: ${totalExpenses.toStringAsFixed(2)} ج.م'),
             const Divider(),
-            Text('الصافي المتوقع بالدرج: ${netCashInDrawer.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF))),
+            Text('الصافي المتوقع بالدرج: ${netCashInDrawer.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
           ],
         ),
         actions: [
@@ -1083,251 +994,102 @@ class _ShiftScreenState extends State<ShiftScreen> {
               });
               if (mounted) Navigator.pop(context);
             },
-            child: const Text('إغلاق وتسليم الوردية'),
+            child: const Text('إغلاق الوردية'),
           ),
         ],
       ),
     );
   }
 
-  String _formatTimestamp(Timestamp? ts) {
-    if (ts == null) return 'غير محدد';
-    DateTime dt = ts.toDate();
-    return "${dt.year}/${dt.month}/${dt.day}  ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}";
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D121D),
-        title: const Text('إدارة الورديات ⏱️', style: TextStyle(color: Color(0xFF00E5FF))),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.date_range, color: Color(0xFF00E5FF)),
-            onPressed: () async {
-              DateTime? picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate ?? DateTime.now(),
-                firstDate: DateTime(2023),
-                lastDate: DateTime(2030),
-              );
-              if (picked != null) {
-                setState(() => _selectedDate = picked);
-              }
-            },
-          ),
-          if (_selectedDate != null)
-            IconButton(
-              icon: const Icon(Icons.clear, color: Colors.redAccent),
-              onPressed: () => setState(() => _selectedDate = null),
-            ),
-        ],
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('إدارة الورديات ⏱️'),
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            StreamBuilder<QuerySnapshot>(
-              stream: _db.collection('shifts').where('isOpen', isEqualTo: true).snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
+        child: StreamBuilder<QuerySnapshot>(
+          stream: _db.collection('shifts').where('isOpen', isEqualTo: true).snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF6C5CE7)));
 
-                if (snapshot.data!.docs.isEmpty) {
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          const Text('لا توجد وردية مفتوحة حالياً', style: TextStyle(fontSize: 16)),
-                          const SizedBox(height: 15),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
-                            onPressed: _startShift,
-                            child: const Text('فتح وردية جديدة الآن'),
-                          )
-                        ],
-                      ),
-                    ),
-                  );
-                }
+            if (snapshot.data!.docs.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('لا توجد وردية مفتوحة حالياً', style: TextStyle(fontSize: 16)),
+                    const SizedBox(height: 15),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C5CE7)),
+                      onPressed: _startShift,
+                      child: const Text('فتح وردية جديدة'),
+                    )
+                  ],
+                ),
+              );
+            }
 
-                var shiftData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-                String shiftId = snapshot.data!.docs.first.id;
-                double startCash = (shiftData['startCash'] ?? 0).toDouble();
+            var shiftData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+            String shiftId = snapshot.data!.docs.first.id;
+            double startCash = (shiftData['startCash'] ?? 0).toDouble();
 
+            return StreamBuilder<QuerySnapshot>(
+              stream: _db.collection('invoices').where('shiftId', isEqualTo: shiftId).snapshots(),
+              builder: (context, invoicesSnap) {
                 return StreamBuilder<QuerySnapshot>(
-                  stream: _db.collection('invoices').where('shiftId', isEqualTo: shiftId).snapshots(),
-                  builder: (context, invoicesSnap) {
-                    return StreamBuilder<QuerySnapshot>(
-                      stream: _db.collection('expenses').where('shiftId', isEqualTo: shiftId).snapshots(),
-                      builder: (context, expensesSnap) {
-                        double currentIncome = 0;
-                        double currentExpenses = 0;
+                  stream: _db.collection('expenses').where('shiftId', isEqualTo: shiftId).snapshots(),
+                  builder: (context, expensesSnap) {
+                    double currentIncome = 0;
+                    double currentExpenses = 0;
 
-                        if (invoicesSnap.hasData) {
-                          for (var doc in invoicesSnap.data!.docs) {
-                            currentIncome += ((doc.data() as Map<String, dynamic>)['finalAmount'] ?? 0).toDouble();
-                          }
-                        }
+                    if (invoicesSnap.hasData) {
+                      for (var doc in invoicesSnap.data!.docs) {
+                        currentIncome += ((doc.data() as Map<String, dynamic>)['finalAmount'] ?? 0).toDouble();
+                      }
+                    }
 
-                        if (expensesSnap.hasData) {
-                          for (var doc in expensesSnap.data!.docs) {
-                            currentExpenses += ((doc.data() as Map<String, dynamic>)['amount'] ?? 0).toDouble();
-                          }
-                        }
+                    if (expensesSnap.hasData) {
+                      for (var doc in expensesSnap.data!.docs) {
+                        currentExpenses += ((doc.data() as Map<String, dynamic>)['amount'] ?? 0).toDouble();
+                      }
+                    }
 
-                        double netProfit = currentIncome - currentExpenses;
-                        double netDrawerCash = startCash + netProfit;
+                    double netProfit = currentIncome - currentExpenses;
+                    double netDrawerCash = startCash + netProfit;
 
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF131927),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF00E5FF)),
-                            boxShadow: [BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.2), blurRadius: 15)],
-                          ),
-                          child: Column(
-                            children: [
-                              const Text('الوردية الحالية نشطة 🟢', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF))),
-                              const SizedBox(height: 5),
-                              Text('بداية الوردية: ${_formatTimestamp(shiftData['startTime'] as Timestamp?)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                              Text('عهد البداية: $startCash ج.م', style: const TextStyle(fontSize: 13)),
-                              const Divider(height: 20, color: Colors.white10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                children: [
-                                  Column(
-                                    children: [
-                                      const Text('الدخل', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text('${currentIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-                                    ],
-                                  ),
-                                  Column(
-                                    children: [
-                                      const Text('المصروفات', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text('${currentExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
-                                    ],
-                                  ),
-                                  Column(
-                                    children: [
-                                      const Text('الصافي بالدرج', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text('${netDrawerCash.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 15),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                onPressed: () => _closeShift(shiftId, currentIncome, currentExpenses, netDrawerCash),
-                                child: const Text('إغلاق وتسليم الوردية'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-
-            const SizedBox(height: 25),
-            Text(
-              _selectedDate == null
-                  ? 'سجل الورديات السابقة 📜'
-                  : 'تصفية تاريخ: ${_selectedDate!.year}/${_selectedDate!.month}/${_selectedDate!.day}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFF007F)),
-            ),
-            const SizedBox(height: 10),
-
-            StreamBuilder<QuerySnapshot>(
-              stream: _db.collection('shifts').where('isOpen', isEqualTo: false).snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
-
-                var docs = snapshot.data!.docs.toList();
-
-                docs.sort((a, b) {
-                  var dataA = a.data() as Map<String, dynamic>;
-                  var dataB = b.data() as Map<String, dynamic>;
-                  Timestamp? tsA = dataA['startTime'] as Timestamp?;
-                  Timestamp? tsB = dataB['startTime'] as Timestamp?;
-                  if (tsA == null) return 1;
-                  if (tsB == null) return -1;
-                  return tsB.compareTo(tsA);
-                });
-
-                if (_selectedDate != null) {
-                  DateTime startFilter = getBusinessDayStart(_selectedDate!);
-                  DateTime endFilter = startFilter.add(const Duration(hours: 24));
-
-                  docs = docs.where((doc) {
-                    var data = doc.data() as Map<String, dynamic>;
-                    Timestamp? ts = data['startTime'] as Timestamp?;
-                    if (ts == null) return false;
-                    DateTime dt = ts.toDate();
-                    return dt.isAfter(startFilter.subtract(const Duration(seconds: 1))) && dt.isBefore(endFilter);
-                  }).toList();
-                }
-
-                if (docs.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Center(child: Text('لا توجد ورديات سابقة مسجلة')),
-                  );
-                }
-
-                return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: docs.length,
-                  itemBuilder: (context, i) {
-                    var shift = docs[i].data() as Map<String, dynamic>;
-                    double totalInc = (shift['totalIncome'] ?? 0).toDouble();
-                    double totalExp = (shift['totalExpenses'] ?? 0).toDouble();
-                    double net = (shift['netProfit'] ?? 0).toDouble();
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ExpansionTile(
-                        leading: const CircleAvatar(backgroundColor: Color(0xFF1F293D), child: Icon(Icons.history, color: Color(0xFF00E5FF))),
-                        title: Text('بداية: ${_formatTimestamp(shift['startTime'] as Timestamp?)}', style: const TextStyle(fontSize: 14)),
-                        subtitle: Text('الصافي: $net ج.م  |  المصروفات: $totalExp ج.م', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E1E),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('عهد البداية: ${shift['startCash'] ?? 0} ج.م'),
-                                    Text('إجمالي الدخل: $totalInc ج.م', style: const TextStyle(color: Colors.greenAccent)),
-                                  ],
-                                ),
-                                const SizedBox(height: 5),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('المصروفات: $totalExp ج.م', style: const TextStyle(color: Colors.redAccent)),
-                                    Text('صافي الدرج: ${shift['expectedDrawerCash'] ?? 0} ج.م', style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          )
+                          const Text('الوردية الحالية نشطة 🟢', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                          const SizedBox(height: 10),
+                          Text('عهد البداية: $startCash ج.م'),
+                          const Divider(),
+                          Text('الدخل: ${currentIncome.toStringAsFixed(2)} ج.م', style: const TextStyle(color: Colors.greenAccent)),
+                          Text('المصروفات: ${currentExpenses.toStringAsFixed(2)} ج.م', style: const TextStyle(color: Colors.redAccent)),
+                          Text('الصافي بالدرج: ${netDrawerCash.toStringAsFixed(2)} ج.م', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                            onPressed: () => _closeShift(shiftId, currentIncome, currentExpenses, netDrawerCash),
+                            child: const Text('إغلاق الوردية'),
+                          ),
                         ],
                       ),
                     );
                   },
                 );
               },
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -1354,8 +1116,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D121D),
-        title: const Text('إعدادات الأسعار ⚙️', style: TextStyle(color: Color(0xFF00E5FF))),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('إعدادات الأسعار ⚙️'),
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _db.collection('settings').doc('rates').snapshots(),
@@ -1372,23 +1134,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.all(16.0),
             child: ListView(
               children: [
-                const Text('أسعار ساعة PS4 (بالجنيه المصري)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF))),
+                const Text('أسعار ساعة PS4', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                TextField(controller: _ps4SingleCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر الفردي (Single)')),
-                TextField(controller: _ps4MultiCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر المتعدد (Multi)')),
-                const Divider(height: 30, color: Colors.white10),
-                const Text('أسعار ساعة PS5 (بالجنيه المصري)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFF007F))),
+                TextField(controller: _ps4SingleCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر الفردي')),
+                TextField(controller: _ps4MultiCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر الزوجي')),
+                const Divider(height: 30),
+                const Text('أسعار ساعة PS5', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                TextField(controller: _ps5SingleCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر الفردي (Single)')),
-                TextField(controller: _ps5MultiCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر المتعدد (Multi)')),
+                TextField(controller: _ps5SingleCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر الفردي')),
+                TextField(controller: _ps5MultiCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر الزوجي')),
                 const SizedBox(height: 30),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E5FF),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.all(15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C5CE7)),
                   onPressed: () {
                     _db.collection('settings').doc('rates').set({
                       'ps4SingleRate': double.tryParse(_ps4SingleCtrl.text) ?? 25.0,
@@ -1398,7 +1155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     });
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الأسعار بنجاح!')));
                   },
-                  child: const Text('حفظ الأسعار الجديدة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: const Text('حفظ الأسعار'),
                 ),
               ],
             ),
