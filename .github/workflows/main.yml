@@ -1,17 +1,16 @@
-name: Build Android APK
+Name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -22,36 +21,16 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
           channel: 'stable'
 
-      - name: Fix Android Project & Embedding V2
-        run: |
-          # 1. حفظ نسخة من google-services.json إذا كان موجوداً
-          cp android/app/google-services.json ./google-services.json.bak || true
-
-          # 2. حذف مجلد android القديم بالكامل لمنع مشاكل V1 Embedding
-          rm -rf android
-
-          # 3. إعادة إنشاء مجلد android نقي وحديث
-          flutter create . --project-name=manga_ps --platforms=android --org=com.mangaps.app
-
-          # 4. استرجاع google-services.json لمكانه الصحيح
-          mkdir -p android/app
-          cp ./google-services.json.bak android/app/google-services.json || true
-
-          # 5. رفع minSdkVersion لـ 23 لملاءمة Firebase
-          sed -i 's/minSdkVersion .*/minSdkVersion 23/' android/app/build.gradle || true
-          sed -i 's/flutter.minSdkVersion/23/' android/app/build.gradle || true
-
-      - name: Get Dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
+          name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
