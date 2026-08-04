@@ -23,8 +23,11 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Rebuild Android Config
-        run: flutter create --platforms=android .
+      # تنظيف المشروع وإعادة إنشاء منصة الأندرويد بشكل سليم تماماً من الصفر
+      - name: Clean and Create Android
+        run: |
+          flutter clean
+          flutter create . --platforms=android
 
       - name: Install Dependencies
         run: flutter pub get
