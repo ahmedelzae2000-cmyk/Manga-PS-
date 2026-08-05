@@ -43,19 +43,3 @@ jobs:
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
-            cp google-services.json android/app/google-services.json
-          fi
-          sed -i 's/flutter.minSdkVersion/21/g' android/app/build.gradle || true
-          sed -i 's/minSdkVersion .*/minSdkVersion 21/g' android/app/build.gradle || true
-
-      - name: Get Dependencies
-        run: flutter pub get
-
-      - name: Build APK via Flutter
-        run: flutter build apk --release --no-tree-shake-icons
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
