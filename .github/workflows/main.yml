@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -22,11 +22,32 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.x'
+          flutter-version: '3.19.6'
           channel: 'stable'
+
+      - name: Re-create Clean Android Project
+        run: |
+          rm -rf android
+          flutter create . --platforms=android --project-name=manga_ps --org=com.mangaps
+
+      - name: Setup Firebase Config & MinSDK
+        run: |
+          mkdir -p android/app
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/google-services.json
+            echo 'apply plugin: "com.google.gms.google-services"' >> android/app/build.gradle
+          fi
+          sed -i 's/flutter.minSdkVersion/21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/g' android/app/build.gradle || true
 
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build APK Verbose
-        run: flutter build apk --release --no-tree-shake-icons -v
+      - name: Build Release APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
