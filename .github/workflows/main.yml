@@ -25,27 +25,25 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
 
-      - name: Generate missing Gradle Wrapper & Android Files
+      - name: Generate Android Project
         run: flutter create . --platforms=android --project-name=manga_ps --org=com.mangaps
 
-      - name: Copy Firebase Config
+      - name: Configure Firebase & Fix Gradle Settings
         run: |
           mkdir -p android/app
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/google-services.json
           fi
+          
+          # Fix minSdkVersion for Firebase
+          sed -i 's/flutter.minSdkVersion/21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle || true
 
-      - name: Get Dependencies
-        run: flutter pub get
-
-      - name: Build APK
-        run: flutter build apk --release --no-tree-shake-icons
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          # Inject Google Services Plugin to settings.gradle
+          echo 'plugins { id "com.google.gms.google-services" version "4.4.0" apply false }' >> android/settings.gradle
+          
+          # Inject Google Services Plugin to app/build.gradle
+          echo 'apply plugin: "com.google.gms.google-services"' >> android/app/build.gradle
 
       - name: Get Dependencies
         run: flutter pub get
