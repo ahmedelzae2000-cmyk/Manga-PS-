@@ -26,7 +26,7 @@ jobs:
           channel: 'stable'
 
       - name: Generate missing Gradle Wrapper & Android Files
-        run: flutter create . --platforms=android
+        run: flutter create . --platforms=android --project-name=manga_ps --org=com.mangaps
 
       - name: Copy Firebase Config
         run: |
@@ -34,6 +34,18 @@ jobs:
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/google-services.json
           fi
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
 
       - name: Get Dependencies
         run: flutter pub get
