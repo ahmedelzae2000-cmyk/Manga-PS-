@@ -35,7 +35,7 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build APK via Flutter
+      - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
