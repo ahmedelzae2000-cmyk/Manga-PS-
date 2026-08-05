@@ -28,10 +28,15 @@ jobs:
       - name: Re-generate Android Platform Files
         run: flutter create . --platforms=android --project-name=manga_ps --org=com.example.manga_ps
 
-      - name: Setup Firebase Gradle Plugin
+      - name: Move google-services.json & Configure Firebase
         run: |
-          echo "buildscript { repositories { google(); mavenCentral() } dependencies { classpath 'com.google.gms:google-services:4.4.0' } }" >> android/build.gradle
-          echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+          mkdir -p android/app
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/
+          fi
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
+          sed -i '/plugins {/a \    id "com.google.gms.google-services"' android/app/build.gradle
+          sed -i '/plugins {/a \    id "com.google.gms.google-services" version "4.4.0" apply false' android/settings.gradle
 
       - name: Get Dependencies
         run: flutter pub get
