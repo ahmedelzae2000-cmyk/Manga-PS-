@@ -1,33 +1,103 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/intl.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // تهيئة Firebase عبر الأكواد
+  try {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "YOUR_API_KEY",
+        appId: "YOUR_APP_ID",
+        messagingSenderId: "YOUR_SENDER_ID",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+      ),
+    );
+  } catch (e) {
+    debugPrint("Firebase init error: $e");
+  }
+
   runApp(const MangaPSApp());
 }
 
-class MangaPSApp extends StatelessWidget {
+class MangaPSApp extends StatefulWidget {
   const MangaPSApp({super.key});
+
+  @override
+  State<MangaPSApp> createState() => _MangaPSAppState();
+}
+
+class _MangaPSAppState extends State<MangaPSApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Manga PS',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.deepOrange,
-        brightness: Brightness.dark,
-      ),
-      home: const MainHomeScreen(),
+      themeMode: _themeMode,
+      theme: ThemeData(brightness: Brightness.light, primarySwatch: Colors.deepOrange),
+      darkTheme: ThemeData(brightness: Brightness.dark, primarySwatch: Colors.deepOrange),
+      home: SplashScreen(onToggleTheme: _toggleTheme),
     );
   }
 }
 
-// نموذج بيانات الجهاز
+// 1. شاشة ترحيبية (Splash Screen)
+class SplashScreen extends StatefulWidget {
+  final VoidCallback onToggleTheme;
+  const SplashScreen({super.key, required this.onToggleTheme});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 3), () {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => MainHomeScreen(onToggleTheme: widget.onToggleTheme)),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset('assets/logo.jpg', height: 120, errorBuilder: (_, __, ___) => const Icon(Icons.gamepad, size: 80, color: Colors.deepOrange)),
+            const SizedBox(height: 20),
+            const Text('مرحباً بكم في Manga PS', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// نموذج البيانات للجهاز
 class Device {
   String id;
-  String name; // مثال: جهاز 1
-  String type; // PS4 أو PS5
-  double hourlyRate; // السعر يدوي
+  String name;
+  String type; // PS4, PS5
+  double singleRate;
+  double multiRate;
+  bool isMulti;
   bool isRunning;
   DateTime? startTime;
 
@@ -35,33 +105,17 @@ class Device {
     required this.id,
     required this.name,
     required this.type,
-    required this.hourlyRate,
+    required this.singleRate,
+    required this.multiRate,
+    this.isMulti = false,
     this.isRunning = false,
     this.startTime,
   });
 }
 
-// نموذج بيانات المعاملة المالية
-class TransactionRecord {
-  final String id;
-  final String title;
-  final double amount;
-  final bool isIncome; // true: أرباح, false: مصاريف
-  final String paymentMethod; // Cash أو Visa
-  final DateTime timestamp;
-
-  TransactionRecord({
-    required this.id,
-    required this.title,
-    required this.amount,
-    required this.isIncome,
-    required this.paymentMethod,
-    required this.timestamp,
-  });
-}
-
 class MainHomeScreen extends StatefulWidget {
-  const MainHomeScreen({super.key});
+  final VoidCallback onToggleTheme;
+  const MainHomeScreen({super.key, required this.onToggleTheme});
 
   @override
   State<MainHomeScreen> createState() => _MainHomeScreenState();
@@ -69,235 +123,181 @@ class MainHomeScreen extends StatefulWidget {
 
 class _MainHomeScreenState extends State<MainHomeScreen> {
   int _selectedIndex = 0;
+  bool isShiftActive = false;
+  DateTime? shiftStartTime;
 
-  // قائمة الأجهزة
   List<Device> devices = [
-    Device(id: '1', name: 'جهاز 1', type: 'PS4', hourlyRate: 40.0),
-    Device(id: '2', name: 'جهاز 2', type: 'PS5', hourlyRate: 60.0),
+    Device(id: '1', name: 'جهاز 1', type: 'PS4', singleRate: 40.0, multiRate: 50.0),
+    Device(id: '2', name: 'جهاز 2', type: 'PS5', singleRate: 60.0, multiRate: 80.0),
   ];
 
-  // سجل المعاملات المالية
-  List<TransactionRecord> transactions = [];
-
-  // دالة تحديد بداية ونهاية الوردية (من 12 ظهراً إلى 12 ظهراً)
-  DateTime getShiftStart(DateTime time) {
-    DateTime adjusted = time.subtract(const Duration(hours: 12));
-    return DateTime(adjusted.year, adjusted.month, adjusted.day, 12, 0);
-  }
-
-  // حساب أرباح الوردية الحالية
-  double get currentShiftIncome {
-    DateTime now = DateTime.now();
-    DateTime shiftStart = getShiftStart(now);
-    DateTime shiftEnd = shiftStart.add(const Duration(hours: 24));
-
-    return transactions
-        .where((t) => t.isIncome && t.timestamp.isAfter(shiftStart) && t.timestamp.isBefore(shiftEnd))
-        .fold(0.0, (sum, item) => sum + item.amount);
-  }
-
-  // إضافة جهاز جديد يدوي
-  void _addDevice(String name, String type, double rate) {
-    setState(() {
-      devices.add(Device(
-        id: DateTime.now().toString(),
-        name: name,
-        type: type,
-        hourlyRate: rate,
-      ));
-    });
-  }
-
-  // إضافة مصروف يدوي
-  void _addExpense(String title, double amount, String method) {
-    setState(() {
-      transactions.add(TransactionRecord(
-        id: DateTime.now().toString(),
-        title: title,
-        amount: amount,
-        isIncome: false,
-        paymentMethod: method,
-        timestamp: DateTime.now(),
-      ));
-    });
-  }
+  List<Map<String, dynamic>> expenses = [];
+  List<Map<String, dynamic>> reports = [];
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      _buildDevicesTab(),
+    final screens = [
+      _buildMainTab(),
+      _buildExpensesTab(),
+      _buildShiftTab(),
       _buildReportsTab(),
+      _buildSettingsTab(),
     ];
 
     return Container(
       decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/bg.jpg'),
-          fit: BoxFit.cover,
-        ),
+        image: DecorationImage(image: AssetImage('assets/bg.jpg'), fit: BoxFit.cover),
       ),
       child: Scaffold(
-        backgroundColor: Colors.black.withOpacity(0.85),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? Colors.black.withOpacity(0.85) 
+            : Colors.white.withOpacity(0.85),
         appBar: AppBar(
           title: Row(
             children: [
-              Image.asset('assets/logo.jpg', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.gamepad)),
-              const SizedBox(width: 12),
+              Image.asset('assets/logo.jpg', height: 35, errorBuilder: (_, __, ___) => const Icon(Icons.gamepad)),
+              const SizedBox(width: 10),
               const Text('Manga PS'),
             ],
           ),
+          actions: [
+            IconButton(icon: const Icon(Icons.brightness_6), onPressed: widget.onToggleTheme),
+          ],
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
-        body: pages[_selectedIndex],
+        body: screens[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
-          backgroundColor: Colors.black87,
-          selectedItemColor: Colors.deepOrangeAccent,
-          unselectedItemColor: Colors.grey,
+          onTap: (i) => setState(() => _selectedIndex = i),
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Colors.deepOrange,
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الأجهزة'),
-            BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'التقارير الشهرية'),
+            BottomNavigationBarItem(icon: Icon(Icons.sports_esports), label: 'الرئيسية'),
+            BottomNavigationBarItem(icon: Icon(Icons.money_off), label: 'المصروفات'),
+            BottomNavigationBarItem(icon: Icon(Icons.access_time), label: 'الوردية'),
+            BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'التقرير'),
+            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'إعدادات السعر'),
           ],
         ),
       ),
     );
   }
 
-  // واجهة الأجهزة
-  Widget _buildDevicesTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Card(
-            color: Colors.deepOrange.withOpacity(0.2),
-            child: ListTile(
-              title: const Text('أرباح الوردية الحالية (12 ظهراً - 12 ظهراً)'),
-              subtitle: Text(
-                '${currentShiftIncome.toStringAsFixed(1)} ج.م',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.greenAccent),
-              ),
-              trailing: ElevatedButton(
-                onPressed: _showAddExpenseDialog,
-                child: const Text('إضافة مصروف'),
-              ),
+  // 1. شاشة الرئيسية (الأجهزة واللعب فردي/مالتي)
+  Widget _buildMainTab() {
+    return ListView.builder(
+      itemCount: devices.length,
+      itemBuilder: (context, i) {
+        final d = devices[i];
+        return Card(
+          margin: const EdgeInsets.all(8.0),
+          child: ListTile(
+            title: Text('${d.name} (${d.type})'),
+            subtitle: Text('فردي: ${d.singleRate} | مالتي: ${d.multiRate} ج.م'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<bool>(
+                  value: d.isMulti,
+                  items: const [
+                    DropdownMenuItem(value: false, child: Text('فردي')),
+                    DropdownMenuItem(value: true, child: Text('مالتي')),
+                  ],
+                  onChanged: d.isRunning ? null : (val) => setState(() => d.isMulti = val!),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: d.isRunning ? Colors.red : Colors.green),
+                  onPressed: () {
+                    if (d.isRunning) {
+                      _finishSessionDialog(d);
+                    } else {
+                      setState(() {
+                        d.isRunning = true;
+                        d.startTime = DateTime.now();
+                      });
+                    }
+                  },
+                  child: Text(d.isRunning ? 'إنهاء' : 'تشغيل'),
+                ),
+              ],
             ),
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: devices.length,
-            itemBuilder: (context, index) {
-              final dev = devices[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  leading: Icon(
-                    dev.type == 'PS5' ? Icons.gamepad : Icons.sports_esports,
-                    color: dev.type == 'PS5' ? Colors.blueAccent : Colors.white,
-                  ),
-                  title: Text('${dev.name} (${dev.type})'),
-                  subtitle: Text('السعر: ${dev.hourlyRate} ج.م/ساعة'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.orange),
-                        onPressed: () => _showEditRateDialog(dev),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: dev.isRunning ? Colors.red : Colors.green,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            if (dev.isRunning) {
-                              dev.isRunning = false;
-                              // إضافة الدخل عند إنهاء الجلسة (تبسيط للحسبة)
-                              transactions.add(TransactionRecord(
-                                id: DateTime.now().toString(),
-                                title: 'جلسة ${dev.name}',
-                                amount: dev.hourlyRate,
-                                isIncome: true,
-                                paymentMethod: 'Cash',
-                                timestamp: DateTime.now(),
-                              ));
-                            } else {
-                              dev.isRunning = true;
-                              dev.startTime = DateTime.now();
-                            }
-                          });
-                        },
-                        child: Text(dev.isRunning ? 'إنهاء' : 'تشغيل'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: ElevatedButton.icon(
-            onPressed: _showAddDeviceDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('إضافة جهاز جديد'),
-            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(45)),
-          ),
-        )
-      ],
+        );
+      },
     );
   }
 
-  // واجهة التقارير الشهرية (تجميع الأرباح والمصاريف)
-  Widget _buildReportsTab() {
-    double totalIncome = transactions.where((t) => t.isIncome).fold(0.0, (s, i) => s + i.amount);
-    double totalExpenses = transactions.where((t) => !t.isIncome).fold(0.0, (s, i) => s + i.amount);
-    double totalCash = transactions.where((t) => t.paymentMethod == 'Cash' && t.isIncome).fold(0.0, (s, i) => s + i.amount);
-    double totalVisa = transactions.where((t) => t.paymentMethod == 'Visa' && t.isIncome).fold(0.0, (s, i) => s + i.amount);
+  // إغلاق الفاتورة وتعديل الحساب يدوياً
+  void _finishSessionDialog(Device d) {
+    double baseRate = d.isMulti ? d.multiRate : d.singleRate;
+    double calculatedAmount = baseRate; 
+    double finalAmount = calculatedAmount;
+    String paymentMethod = 'كاش';
 
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('إنهاء فاتورة ${d.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('المبلغ المحسوب: $calculatedAmount ج.م'),
+            TextField(
+              decoration: const InputDecoration(labelText: 'تعديل الحساب يدوياً (الصافي)'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => finalAmount = double.tryParse(val) ?? calculatedAmount,
+            ),
+            DropdownButtonFormField<String>(
+              value: paymentMethod,
+              items: const [
+                DropdownMenuItem(value: 'كاش', child: Text('كاش')),
+                DropdownMenuItem(value: 'فيزا', child: Text('فيزا')),
+                DropdownMenuItem(value: 'نقدي', child: Text('نقدي')),
+              ],
+              onChanged: (val) => paymentMethod = val!,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                d.isRunning = false;
+                reports.add({
+                  'title': 'جلسة ${d.name}',
+                  'amount': finalAmount,
+                  'method': paymentMethod,
+                  'date': DateTime.now(),
+                });
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('حفظ واغلاق الفاتورة'),
+          )
+        ],
+      ),
+    );
+  }
+
+  // 2. شاشة المصروفات
+  Widget _buildExpensesTab() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('الملخص المالي الشامل', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatCard('إجمالي الأرباح', '${totalIncome.toStringAsFixed(1)} ج.م', Colors.green),
-              _buildStatCard('إجمالي المصاريف', '${totalExpenses.toStringAsFixed(1)} ج.م', Colors.red),
-            ],
+          ElevatedButton(
+            onPressed: () {
+              // إضافة مصروف
+            },
+            child: const Text('إضافة مصروف جديد'),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildStatCard('كاش (Cash)', '${totalCash.toStringAsFixed(1)} ج.م', Colors.amber),
-              _buildStatCard('فيزا (Visa)', '${totalVisa.toStringAsFixed(1)} ج.م', Colors.blue),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Text('سجل العمليات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           Expanded(
             child: ListView.builder(
-              itemCount: transactions.length,
-              itemBuilder: (context, index) {
-                final item = transactions[index];
-                return ListTile(
-                  title: Text(item.title),
-                  subtitle: Text(DateFormat('yyyy/MM/dd - hh:mm a').format(item.timestamp)),
-                  trailing: Text(
-                    '${item.isIncome ? '+' : '-'}${item.amount} ج.م (${item.paymentMethod})',
-                    style: TextStyle(
-                      color: item.isIncome ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                );
-              },
+              itemCount: expenses.length,
+              itemBuilder: (ctx, i) => ListTile(title: Text(expenses[i]['title'])),
             ),
           )
         ],
@@ -305,139 +305,61 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, Color color) {
-    return Expanded(
-      child: Card(
-        color: color.withOpacity(0.2),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            children: [
-              Text(title, style: const TextStyle(fontSize: 14)),
-              const SizedBox(height: 6),
-              Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-            ],
+  // 3. شاشة الوردية (بدء يدوي من 12 ظهراً)
+  Widget _buildShiftTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(isShiftActive ? 'الوردية شغالة من 12 ظهراً' : 'لا يوجد وردية مفتوحة حالياً'),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                isShiftActive = !isShiftActive;
+                shiftStartTime = isShiftActive ? DateTime.now() : null;
+              });
+            },
+            child: Text(isShiftActive ? 'إنهاء الوردية' : 'بدء وردية جديدة (12ظ - 12ظ)'),
           ),
-        ),
-      ),
-    );
-  }
-
-  // النافذة المنبثقة لإضافة جهاز
-  void _showAddDeviceDialog() {
-    String name = '';
-    String type = 'PS4';
-    double rate = 40.0;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('إضافة جهاز جديد'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              decoration: const InputDecoration(labelText: 'اسم الجهاز (مثال: جهاز 3)'),
-              onChanged: (val) => name = val,
-            ),
-            DropdownButtonFormField<String>(
-              value: type,
-              items: const [
-                DropdownMenuItem(value: 'PS4', child: Text('PlayStation 4')),
-                DropdownMenuItem(value: 'PS5', child: Text('PlayStation 5')),
-              ],
-              onChanged: (val) => type = val!,
-            ),
-            TextField(
-              decoration: const InputDecoration(labelText: 'سعر الساعة (ج.م)'),
-              keyboardType: TextInputType.number,
-              onChanged: (val) => rate = double.tryParse(val) ?? 40.0,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ElevatedButton(
-            onPressed: () {
-              if (name.isNotEmpty) _addDevice(name, type, rate);
-              Navigator.pop(ctx);
-            },
-            child: const Text('إضافة'),
-          )
         ],
       ),
     );
   }
 
-  // النافذة المنبثقة لتعديل السعر
-  void _showEditRateDialog(Device dev) {
-    double newRate = dev.hourlyRate;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('تعديل سعر ${dev.name}'),
-        content: TextField(
-          decoration: const InputDecoration(labelText: 'السعر الجديد للساعة'),
-          keyboardType: TextInputType.number,
-          onChanged: (val) => newRate = double.tryParse(val) ?? dev.hourlyRate,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => dev.hourlyRate = newRate);
-              Navigator.pop(ctx);
-            },
-            child: const Text('حفظ'),
-          )
-        ],
-      ),
+  // 4. شاشة التقرير
+  Widget _buildReportsTab() {
+    return ListView.builder(
+      itemCount: reports.length,
+      itemBuilder: (ctx, i) {
+        final r = reports[i];
+        return ListTile(
+          title: Text(r['title']),
+          subtitle: Text('طريقة الدفع: ${r['method']}'),
+          trailing: Text('${r['amount']} ج.م', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+        );
+      },
     );
   }
 
-  // النافذة المنبثقة لإضافة مصروف
-  void _showAddExpenseDialog() {
-    String title = '';
-    double amount = 0.0;
-    String method = 'Cash';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('إضافة مصروف جديد'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              decoration: const InputDecoration(labelText: 'بيان المصروف'),
-              onChanged: (val) => title = val,
-            ),
-            TextField(
-              decoration: const InputDecoration(labelText: 'المبلغ (ج.م)'),
-              keyboardType: TextInputType.number,
-              onChanged: (val) => amount = double.tryParse(val) ?? 0.0,
-            ),
-            DropdownButtonFormField<String>(
-              value: method,
-              items: const [
-                DropdownMenuItem(value: 'Cash', child: Text('كاش (Cash)')),
-                DropdownMenuItem(value: 'Visa', child: Text('فيزا (Visa)')),
-              ],
-              onChanged: (val) => method = val!,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ElevatedButton(
+  // 5. شاشة إعدادات السعر للأجهزة
+  Widget _buildSettingsTab() {
+    return ListView.builder(
+      itemCount: devices.length,
+      itemBuilder: (ctx, i) {
+        final d = devices[i];
+        return ListTile(
+          title: Text(d.name),
+          subtitle: Text('فردي: ${d.singleRate} | مالتي: ${d.multiRate}'),
+          trailing: IconButton(
+            icon: const Icon(Icons.edit),
             onPressed: () {
-              if (title.isNotEmpty && amount > 0) _addExpense(title, amount, method);
-              Navigator.pop(ctx);
+              // تعديل أسعار الفردي والمالتي
             },
-            child: const Text('حفظ المصروف'),
-          )
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }
+ 
