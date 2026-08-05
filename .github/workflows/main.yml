@@ -28,18 +28,28 @@ jobs:
       - name: Generate Android Project
         run: flutter create . --platforms=android --project-name=manga_ps --org=com.mangaps
 
-      - name: Copy Firebase Config
+      - name: Copy Firebase Config & Inject Gradle Plugins
         run: |
           mkdir -p android/app
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/google-services.json
           fi
+          
+          # 1. Update minSdkVersion to 21 for Firebase
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle || true
+          sed -i 's/flutter.minSdkVersion/21/' android/app/build.gradle || true
+
+          # 2. Add Google Services plugin to settings.gradle
+          sed -i '/plugins {/a \    id "com.google.gms.google-services" version "4.4.0" apply false' android/settings.gradle
+
+          # 3. Apply Google Services plugin inside app/build.gradle
+          echo 'apply plugin: "com.google.gms.google-services"' >> android/app/build.gradle
 
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build APK with MinSDK Fix
-        run: flutter build apk --release --no-tree-shake-icons --extra-gen-snapshot-options=--min-sdk-version=21
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
