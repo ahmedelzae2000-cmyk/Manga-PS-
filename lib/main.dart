@@ -5,15 +5,15 @@ import 'package:intl/intl.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تهيئة Firebase عبر الأكواد
   try {
+    // استبدل هذه القيم ببيانات مشروعك من Firebase Console
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: "YOUR_API_KEY",
-        appId: "YOUR_APP_ID",
-        messagingSenderId: "YOUR_SENDER_ID",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_STORAGE_BUCKET",
+        apiKey: "AIzaSyDummyKeyForMangaPSApp",
+        appId: "1:123456789:android:manga_ps",
+        messagingSenderId: "123456789",
+        projectId: "manga-ps-app",
+        storageBucket: "manga-ps-app.appspot.com",
       ),
     );
   } catch (e) {
@@ -186,46 +186,61 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   // 1. شاشة الرئيسية (الأجهزة واللعب فردي/مالتي)
   Widget _buildMainTab() {
-    return ListView.builder(
-      itemCount: devices.length,
-      itemBuilder: (context, i) {
-        final d = devices[i];
-        return Card(
-          margin: const EdgeInsets.all(8.0),
-          child: ListTile(
-            title: Text('${d.name} (${d.type})'),
-            subtitle: Text('فردي: ${d.singleRate} | مالتي: ${d.multiRate} ج.م'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButton<bool>(
-                  value: d.isMulti,
-                  items: const [
-                    DropdownMenuItem(value: false, child: Text('فردي')),
-                    DropdownMenuItem(value: true, child: Text('مالتي')),
-                  ],
-                  onChanged: d.isRunning ? null : (val) => setState(() => d.isMulti = val!),
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            itemCount: devices.length,
+            itemBuilder: (context, i) {
+              final d = devices[i];
+              return Card(
+                margin: const EdgeInsets.all(8.0),
+                child: ListTile(
+                  title: Text('${d.name} (${d.type})'),
+                  subtitle: Text('فردي: ${d.singleRate} | مالتي: ${d.multiRate} ج.م'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DropdownButton<bool>(
+                        value: d.isMulti,
+                        items: const [
+                          DropdownMenuItem(value: false, child: Text('فردي')),
+                          DropdownMenuItem(value: true, child: Text('مالتي')),
+                        ],
+                        onChanged: d.isRunning ? null : (val) => setState(() => d.isMulti = val!),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: d.isRunning ? Colors.red : Colors.green),
+                        onPressed: () {
+                          if (d.isRunning) {
+                            _finishSessionDialog(d);
+                          } else {
+                            setState(() {
+                              d.isRunning = true;
+                              d.startTime = DateTime.now();
+                            });
+                          }
+                        },
+                        child: Text(d.isRunning ? 'إنهاء' : 'تشغيل'),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: d.isRunning ? Colors.red : Colors.green),
-                  onPressed: () {
-                    if (d.isRunning) {
-                      _finishSessionDialog(d);
-                    } else {
-                      setState(() {
-                        d.isRunning = true;
-                        d.startTime = DateTime.now();
-                      });
-                    }
-                  },
-                  child: Text(d.isRunning ? 'إنهاء' : 'تشغيل'),
-                ),
-              ],
-            ),
+              );
+            },
           ),
-        );
-      },
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: ElevatedButton.icon(
+            onPressed: _showAddDeviceDialog,
+            icon: const Icon(Icons.add),
+            label: const Text('إضافة جهاز جديد'),
+            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(45)),
+          ),
+        ),
+      ],
     );
   }
 
@@ -282,23 +297,140 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     );
   }
 
+  // إضافة جهاز يدوي
+  void _showAddDeviceDialog() {
+    String name = '';
+    String type = 'PS4';
+    double sRate = 40.0;
+    double mRate = 50.0;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('إضافة جهاز جديد'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'اسم الجهاز'),
+              onChanged: (val) => name = val,
+            ),
+            DropdownButtonFormField<String>(
+              value: type,
+              items: const [
+                DropdownMenuItem(value: 'PS4', child: Text('PS4')),
+                DropdownMenuItem(value: 'PS5', child: Text('PS5')),
+              ],
+              onChanged: (val) => type = val!,
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'سعر الفردي'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => sRate = double.tryParse(val) ?? 40.0,
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'سعر المالتي'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => mRate = double.tryParse(val) ?? 50.0,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              if (name.isNotEmpty) {
+                setState(() {
+                  devices.add(Device(
+                    id: DateTime.now().toString(),
+                    name: name,
+                    type: type,
+                    singleRate: sRate,
+                    multiRate: mRate,
+                  ));
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('إضافة'),
+          )
+        ],
+      ),
+    );
+  }
+
   // 2. شاشة المصروفات
   Widget _buildExpensesTab() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          ElevatedButton(
-            onPressed: () {
-              // إضافة مصروف
-            },
-            child: const Text('إضافة مصروف جديد'),
+          ElevatedButton.icon(
+            onPressed: _showAddExpenseDialog,
+            icon: const Icon(Icons.add),
+            label: const Text('إضافة مصروف جديد'),
           ),
+          const SizedBox(height: 12),
           Expanded(
             child: ListView.builder(
               itemCount: expenses.length,
-              itemBuilder: (ctx, i) => ListTile(title: Text(expenses[i]['title'])),
+              itemBuilder: (ctx, i) => Card(
+                child: ListTile(
+                  title: Text(expenses[i]['title']),
+                  trailing: Text('${expenses[i]['amount']} ج.م (${expenses[i]['method']})', style: const TextStyle(color: Colors.red)),
+                ),
+              ),
             ),
+          )
+        ],
+      ),
+    );
+  }
+
+  void _showAddExpenseDialog() {
+    String title = '';
+    double amount = 0.0;
+    String method = 'كاش';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('إضافة مصروف جديد'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'البيان'),
+              onChanged: (val) => title = val,
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'المبلغ'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => amount = double.tryParse(val) ?? 0.0,
+            ),
+            DropdownButtonFormField<String>(
+              value: method,
+              items: const [
+                DropdownMenuItem(value: 'كاش', child: Text('كاش')),
+                DropdownMenuItem(value: 'فيزا', child: Text('فيزا')),
+                DropdownMenuItem(value: 'نقدي', child: Text('نقدي')),
+              ],
+              onChanged: (val) => method = val!,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              if (title.isNotEmpty && amount > 0) {
+                setState(() {
+                  expenses.add({'title': title, 'amount': amount, 'method': method});
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('حفظ'),
           )
         ],
       ),
@@ -311,16 +443,29 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(isShiftActive ? 'الوردية شغالة من 12 ظهراً' : 'لا يوجد وردية مفتوحة حالياً'),
+          Icon(
+            isShiftActive ? Icons.check_circle : Icons.pause_circle,
+            size: 80,
+            color: isShiftActive ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isShiftActive ? 'الوردية شغالة حالياً (12 ظهراً - 12 ظهراً)' : 'لا يوجد وردية مفتوحة',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 20),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isShiftActive ? Colors.red : Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            ),
             onPressed: () {
               setState(() {
                 isShiftActive = !isShiftActive;
                 shiftStartTime = isShiftActive ? DateTime.now() : null;
               });
             },
-            child: Text(isShiftActive ? 'إنهاء الوردية' : 'بدء وردية جديدة (12ظ - 12ظ)'),
+            child: Text(isShiftActive ? 'إنهاء الوردية' : 'بدء وردية جديدة يدوياً'),
           ),
         ],
       ),
@@ -333,10 +478,13 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       itemCount: reports.length,
       itemBuilder: (ctx, i) {
         final r = reports[i];
-        return ListTile(
-          title: Text(r['title']),
-          subtitle: Text('طريقة الدفع: ${r['method']}'),
-          trailing: Text('${r['amount']} ج.م', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: ListTile(
+            title: Text(r['title']),
+            subtitle: Text('طريقة الدفع: ${r['method']}'),
+            trailing: Text('${r['amount']} ج.م', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+          ),
         );
       },
     );
@@ -348,18 +496,57 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       itemCount: devices.length,
       itemBuilder: (ctx, i) {
         final d = devices[i];
-        return ListTile(
-          title: Text(d.name),
-          subtitle: Text('فردي: ${d.singleRate} | مالتي: ${d.multiRate}'),
-          trailing: IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // تعديل أسعار الفردي والمالتي
-            },
+        return Card(
+          child: ListTile(
+            title: Text(d.name),
+            subtitle: Text('فردي: ${d.singleRate} | مالتي: ${d.multiRate} ج.م'),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit, color: Colors.orange),
+              onPressed: () => _showEditRatesDialog(d),
+            ),
           ),
         );
       },
     );
   }
+
+  void _showEditRatesDialog(Device d) {
+    double newSingle = d.singleRate;
+    double newMulti = d.multiRate;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('تعديل أسعار ${d.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'سعر الساعة (فردي)'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => newSingle = double.tryParse(val) ?? d.singleRate,
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'سعر الساعة (مالتي)'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => newMulti = double.tryParse(val) ?? d.multiRate,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                d.singleRate = newSingle;
+                d.multiRate = newMulti;
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('حفظ الأسعار'),
+          )
+        ],
+      ),
+    );
+  }
 }
- 
