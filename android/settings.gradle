@@ -1,29 +1,16 @@
-include ':app'
-
-def localPropertiesFile = new File(rootDir, "local.properties")
-def properties = new Properties()
-
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader("UTF-8") { reader -> properties.load(reader) }
-}
-
-def flutterSdkPath = properties.getProperty("flutter.sdk")
-if (flutterSdkPath != null) {
-    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-}
-
 pluginManagement {
-    def flutterSdkPathFromProperties = {
+    def flutterSdkPath = {
+        def properties = new Properties()
         def propertiesFile = new File(rootDir, 'local.properties')
         if (propertiesFile.exists()) {
-            propertiesFile.withReader('UTF-8') { reader ->
-                def props = new Properties()
-                props.load(reader)
-                return props.getProperty('flutter.sdk')
-            }
+            propertiesFile.withReader('UTF-8') { reader -> properties.load(reader) }
         }
-        return null
+        def sdkPath = properties.getProperty('flutter.sdk')
+        assert sdkPath != null : "flutter.sdk not set in local.properties"
+        return sdkPath
     }()
+
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
         google()
@@ -37,3 +24,5 @@ plugins {
     id "org.jetbrains.kotlin.android" version "1.8.22" apply false
     id "com.google.gms.google-services" version "4.4.0" apply false
 }
+
+include ":app"
