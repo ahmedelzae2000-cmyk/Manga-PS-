@@ -25,6 +25,9 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
 
+      - name: Generate missing Gradle Wrapper & Android Files
+        run: flutter create . --platforms=android
+
       - name: Copy Firebase Config
         run: |
           mkdir -p android/app
@@ -35,11 +38,8 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build APK via Gradle
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
