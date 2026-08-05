@@ -28,6 +28,11 @@ jobs:
       - name: Re-generate Android Platform Files
         run: flutter create . --platforms=android --project-name=manga_ps --org=com.example.manga_ps
 
+      - name: Setup Firebase Gradle Plugin
+        run: |
+          echo "buildscript { repositories { google(); mavenCentral() } dependencies { classpath 'com.google.gms:google-services:4.4.0' } }" >> android/build.gradle
+          echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+
       - name: Get Dependencies
         run: flutter pub get
 
