@@ -38,8 +38,8 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build APK
-        run: flutter build apk --release --no-tree-shake-icons --extra-front-end-options="--no-link-platform"
+      - name: Build APK with MinSDK Fix
+        run: flutter build apk --release --no-tree-shake-icons --extra-gen-snapshot-options=--min-sdk-version=21
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
