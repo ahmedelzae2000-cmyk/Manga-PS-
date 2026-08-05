@@ -35,8 +35,11 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build APK (Verbose Trace)
-        run: flutter build apk --release --no-tree-shake-icons --verbose
+      - name: Build APK via Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
