@@ -22,10 +22,10 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
+          flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Clean Project & Recreate Android
+      - name: Clean and Recreate Android Project
         run: |
           rm -rf android
           flutter clean
@@ -40,5 +40,5 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
+          name: manga-ps-apk
           path: build/app/outputs/flutter-apk/app-release.apk
