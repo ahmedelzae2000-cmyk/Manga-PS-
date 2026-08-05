@@ -58,9 +58,11 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future.delayed(const Duration(seconds: 3), () {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => MainHomeScreen(onToggleTheme: widget.onToggleTheme)),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => MainHomeScreen(onToggleTheme: widget.onToggleTheme)),
+        );
+      }
     });
   }
 
@@ -229,7 +231,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                                 child: GestureDetector(
                                   onTap: d.isRunning ? null : () => setState(() => d.isMulti = true),
                                   child: Container(
-                                    padding: const EdgeInsets.vertical(6),
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
                                     decoration: BoxDecoration(color: d.isMulti ? const Color(0xFF4A4A5A) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
                                     child: const Center(child: Text('زوجي', style: TextStyle(fontSize: 12, color: Colors.white))),
                                   ),
@@ -239,7 +241,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                                 child: GestureDetector(
                                   onTap: d.isRunning ? null : () => setState(() => d.isMulti = false),
                                   child: Container(
-                                    padding: const EdgeInsets.vertical(6),
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
                                     decoration: BoxDecoration(color: !d.isMulti ? const Color(0xFF4A4A5A) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
                                     child: const Center(child: Text('فردي', style: TextStyle(fontSize: 12, color: Colors.white))),
                                   ),
@@ -316,7 +318,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             onPressed: () async {
               setState(() => d.isRunning = false);
               
-              // حفظ الفاتورة في Cloud Firestore
               await FirebaseFirestore.instance.collection('reports').add({
                 'title': 'جلسة ${d.name}',
                 'amount': finalAmount,
@@ -372,7 +373,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     );
   }
 
-  // 2. المصروفات مبروطة بـ Firebase
+  // 2. المصروفات مربوطة بـ Firebase
   Widget _buildExpensesTab() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -458,7 +459,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     );
   }
 
-  // 3. التقارير المفصلة والمختصرة المربوطة بالبيانات القديمة والجديدة مباشرة من Firebase
+  // 3. التقارير المفصلة والمختصرة
   Widget _buildReportsTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('reports').snapshots(),
@@ -472,7 +473,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
             final now = DateTime.now();
 
-            // تجهيز بيانات التقارير القديمة والحديثة
             final allReports = reportsSnapshot.data?.docs.map((doc) {
               final d = doc.data() as Map<String, dynamic>;
               DateTime date = (d['date'] as Timestamp?)?.toDate() ?? DateTime.now();
@@ -485,7 +485,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               return {'title': d['title'], 'amount': (d['amount'] as num).toDouble(), 'date': date};
             }).toList() ?? [];
 
-            // تصفية اليوم
             final todayReports = allReports.where((r) => (r['date'] as DateTime).year == now.year && (r['date'] as DateTime).month == now.month && (r['date'] as DateTime).day == now.day).toList();
             final todayExpenses = allExpenses.where((e) => (e['date'] as DateTime).year == now.year && (e['date'] as DateTime).month == now.month && (e['date'] as DateTime).day == now.day).toList();
 
@@ -493,7 +492,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             double todayExpensesSum = todayExpenses.fold(0.0, (sum, item) => sum + (item['amount'] as double));
             double todayNet = todayIncome - todayExpensesSum;
 
-            // تصفية الشهر
             final monthReports = allReports.where((r) => (r['date'] as DateTime).year == now.year && (r['date'] as DateTime).month == now.month).toList();
             final monthExpenses = allExpenses.where((e) => (e['date'] as DateTime).year == now.year && (e['date'] as DateTime).month == now.month).toList();
 
@@ -517,7 +515,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        // التقرير اليومي
                         Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
@@ -562,8 +559,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                             ],
                           ),
                         ),
-
-                        // التقرير الشهري
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
